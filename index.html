@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>WebGame</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #c8c8c3; touch-action: none; }
+    canvas#canvas { display: block; position: fixed; top: 0; left: -9999px; }
+    canvas#three-canvas { display: block; position: fixed; top: 0; left: 0; z-index: 1; }
+
+    /* ── BOTTOM BUTTONS ──────────────────────────────── */
+    #bottom-bar {
+      position: fixed;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #bottom-bar button {
+      width: 80px;
+      height: 80px;
+      border: none;
+      background: none;
+      padding: 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, transform 0.1s;
+    }
+    #bottom-bar button { touch-action: manipulation; }
+    .arrow { pointer-events: none; }
+    #center-btns {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .pill-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    #center-btns button {
+      width: auto !important;
+      height: auto !important;
+      background: none;
+      border: 2.5px solid #222;
+      border-radius: 999px;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      padding: 0;
+    }
+    .pill-wrap span {
+      font-family: sans-serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #222;
+      text-transform: lowercase;
+    }
+    /* ── OVERLAY SCREENS ─────────────────────────────── */
+    .overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 50; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(200,200,195,0.96);
+      font-family: sans-serif; color: #222;
+    }
+    .overlay.hidden { display: none; }
+    .overlay h1 { font-size: 1.6rem; margin-bottom: 12px; }
+    .overlay h2 { font-size: 1.1rem; margin-bottom: 16px; font-weight: 400; }
+    .overlay table { border-collapse: collapse; width: 80%; max-width: 340px; margin-bottom: 20px; }
+    .overlay th, .overlay td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #aaa; font-size: 0.85rem; }
+    .overlay th { font-weight: 700; }
+    .overlay td:last-child, .overlay th:last-child { text-align: right; }
+    .overlay input {
+      width: 80%; max-width: 300px; padding: 10px 14px; margin: 6px 0;
+      border: 2px solid #222; border-radius: 8px; font-size: 0.95rem;
+      background: #fff; color: #222; outline: none;
+    }
+    .overlay .btn {
+      padding: 10px 32px; margin-top: 12px; border: 2px solid #222;
+      border-radius: 999px; background: #222; color: #fff;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    }
+    .overlay .btn:active { opacity: 0.7; }
+    .overlay .btn-outline { background: none; color: #222; }
+    .overlay .score-big { font-size: 2.2rem; font-weight: 800; margin: 8px 0; }
+    .overlay .loading { opacity: 0.5; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <!-- LEADERBOARD SCREEN (shown before game) -->
+  <div id="screen-leaderboard" class="overlay">
+    <h1>LEADERBOARD</h1>
+    <table>
+      <thead><tr><th>#</th><th>Player</th><th>Score</th></tr></thead>
+      <tbody id="lb-body"><tr><td colspan="3" class="loading">Loading...</td></tr></tbody>
+    </table>
+    <button class="btn" id="btn-play">PLAY</button>
+  </div>
+
+  <!-- GAME OVER SCREEN (shown after game ends) -->
+  <div id="screen-gameover" class="overlay hidden">
+    <h1>GAME OVER</h1>
+    <div class="score-big" id="go-score">0</div>
+    <h2>Submit your score</h2>
+    <input id="go-username" type="text" placeholder="Username" maxlength="20" autocomplete="off">
+    <input id="go-email" type="email" placeholder="Email" autocomplete="off">
+    <button class="btn" id="btn-submit">SUBMIT</button>
+    <div id="go-msg" style="margin-top:10px;font-size:0.85rem"></div>
+    <button class="btn btn-outline" id="btn-replay" style="margin-top:8px">PLAY AGAIN</button>
+  </div>
+
+  <canvas id="canvas"></canvas>
+  <img id="top-bar" src="svg/top.svg" style="position:fixed;pointer-events:none;z-index:10;object-fit:fill">
+  <div id="bottom-bar">
+    <svg class="arrow arrow-left" viewBox="0 0 40 60"><polygon points="40,0 0,30 40,60" fill="#222"/></svg>
+    <button id="chr-prev"><img src="svg/button.svg" style="width:100%;height:100%;pointer-events:none"></button>
+    <div id="center-btns">
+      <div class="pill-wrap"><button id="sound-btn"></button><span>sound</span></div>
+      <div class="pill-wrap"><button id="pause-btn"></button><span>play/pause</span></div>
+    </div>
+    <button id="chr-next"><img src="svg/button.svg" style="width:100%;height:100%;pointer-events:none"></button>
+    <svg class="arrow arrow-right" viewBox="0 0 40 60"><polygon points="0,0 40,30 0,60" fill="#222"/></svg>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════
+    // ── LEADERBOARD API (Google Apps Script URL) ───────
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkB7i8CCS94Q7vtgGFS7YCQJUKywLab6jjRPtO_PW0THfWG3rQFLHT4KuEmwqIRHIz/exec';
+
+    // Shadow score: XOR'd with a mask, stored under an obscure name
+    const _m = 0xA3F1; // XOR mask
+    let _v = 0 ^ _m;   // shadow value (score ^ mask)
+    function _sv(d) { _v = (_v ^ _m); _v += d; _v = _v ^ _m; } // shadow update
+    function _gv() { return _v ^ _m; } // get real shadow score
+    function _rv() { _v = 0 ^ _m; } // reset shadow
+
+    const MOBILE_ONLY      = false;
+    const ACTIVE_OPACITY   = 1.0;
+    const INACTIVE_OPACITY = 0;
+    let BPM                = 120;
+    const STOOL_FLIP_PROB  = 0.02;
+    const BG_OPACITY       = 0.01;
+    const SPAWN_MIN        = 1;   // min beats between spawns
+    const SPAWN_MAX        = 3;   // max beats between spawns
+    const SPAWN_CHANCE     = 5.95; // probability of spawning when timer hits
+    const BOTTLE_CHANCE    = 0.1; // probability of bottle vs bun
+    // ═══════════════════════════════════════════════════════
+
+    let BEAT_MS = 60000 / BPM;
+    const IMG_W   = 1241;
+    const IMG_H   = 1754;
+    const IMG_AR  = IMG_W / IMG_H;
+    const PLANE_H = 5 / 3; // fraction of screen height (83.3%)
+
+    // ── CANVAS 2D SETUP ───────────────────────────────────
+    const canvas = document.getElementById('canvas');
+    const ctx    = canvas.getContext('2d');
+
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+    function resizeCanvas() {
+      canvas.style.width  = window.innerWidth  + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      canvas.width  = Math.round(window.innerWidth  * DPR);
+      canvas.height = Math.round(window.innerHeight * DPR);
+      ctx.scale(DPR, DPR);
+    }
+    resizeCanvas();
+
+    // Compute the draw rect in CSS pixels (context is pre-scaled by DPR)
+    function drawRect() {
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const topRatio = 235.59 / 1920; // top bar height relative to width
+      const btnRatio = 0.20;          // button size relative to width
+      const gapTop = 16;              // spacing between top bar and game
+      const gapBot = 12;              // spacing between game and buttons
+      const padBot = 24;              // padding below buttons
+      // h + w*topRatio + w*btnRatio + gapTop + gapBot + padBot <= vh
+      const maxH = (vh - gapTop - gapBot - padBot) / (1 + IMG_AR * (topRatio + btnRatio));
+      const h = Math.min(vh * PLANE_H / 2 - 10, maxH);
+      const w = h * IMG_AR;
+      const topH = w * topRatio;
+      const btnH = w * btnRatio;
+      // Center the whole stack vertically (including bottom padding)
+      const totalH = topH + gapTop + h + gapBot + btnH + padBot;
+      const startY = (vh - totalH) / 2;
+      const x = (vw - w) / 2;
+      const y = startY + topH + gapTop;
+      return { x, y, w, h };
+    }
+
+    // ── LAYER SYSTEM (replaces Three.js meshes) ───────────
+    // Each layer: { img: HTMLImageElement, opacity: number }
+    // Drawn back-to-front in insertion order.
+    const layers = [];
+
+    function makeMesh(src, _z, opacity) {
+      const mat = { img: null, opacity }; // mat.opacity is what all game logic modifies
+      layers.push(mat);
+      const el = new Image();
+      el.onload = () => createImageBitmap(el).then(bmp => { mat.img = bmp; });
+      el.src = src;
+      return { mat };
+    }
+
+    // ── LAYERS ────────────────────────────────────────────
+
+    // BG base
+    makeMesh('Blocks/bg.webp', 0, BG_OPACITY);
+
+    // BG
+    const fireestMat = makeMesh('Blocks/BG/fireest.webp', 0, INACTIVE_OPACITY).mat;
+    const bgAlways   = ['fridge', 'machine', 'sign'].map(n =>
+      makeMesh(`Blocks/BG/${n}.webp`, 0, INACTIVE_OPACITY).mat
+    );
+
+    // Stools
+    const stoolMats = [1,2,3,4,5].map(n =>
+      makeMesh(`Blocks/BG/stools/stool${n}.webp`, 0, INACTIVE_OPACITY).mat
+    );
+    const stoolOn = [true, true, true, true, true];
+
+    // Snowflakes
+    const snowMats = [1,2,3,4].map(n =>
+      makeMesh(`Blocks/BG/Snowflakes/snowflake${n}.webp`, 0, INACTIVE_OPACITY).mat
+    );
+    let snowIndex = 0;
+
+    // DJ
+    const djSharedMat     = makeMesh('Blocks/DJ/djshared.webp',            0, INACTIVE_OPACITY).mat;
+    const djHandSharedMat = makeMesh('Blocks/DJ/djhand/djhandshared.webp', 0, INACTIVE_OPACITY).mat;
+    const djHandTopMat    = makeMesh('Blocks/DJ/djhand/djhandtop.webp',    0, INACTIVE_OPACITY).mat;
+    const djHandBottomMat = makeMesh('Blocks/DJ/djhand/djhandbottom.webp', 0, INACTIVE_OPACITY).mat;
+    const djWavesMat      = makeMesh('Blocks/DJ/djwaves.webp',             0, INACTIVE_OPACITY).mat;
+    const djDropMats      = [1,2,3].map(n =>
+      makeMesh(`Blocks/DJ/djdrop${n}.webp`, 0, INACTIVE_OPACITY).mat
+    );
+    let djDropIndex = 0;
+
+    // Steps
+    const FILES  = Array.from({ length: 19 }, (_, i) => i === 0 ? 'Step1' : `step${i + 1}`);
+    const planes = FILES.map(name => makeMesh(`Blocks/Steps/${name}.webp`, 0, INACTIVE_OPACITY));
+
+    // Characters (1–5)
+    function makeChr(n) {
+      const base = `Blocks/Character/chr${n}/chr${n}`;
+      const shared = makeMesh(`${base}shared.webp`, 0, INACTIVE_OPACITY).mat;
+      const exc   = makeMesh(`${base}exc.webp`,   0, INACTIVE_OPACITY).mat;
+      const tears = makeMesh(`${base}tears.webp`, 0, INACTIVE_OPACITY).mat;
+      const bolts = makeMesh(`${base}bolts.webp`, 0, INACTIVE_OPACITY).mat;
+      const walk1 = makeMesh(`${base}walk1.webp`, 0, INACTIVE_OPACITY).mat;
+      const walk2 = makeMesh(`${base}walk2.webp`, 0, INACTIVE_OPACITY).mat;
+      return { shared, exc, tears, bolts, walk1, walk2 };
+    }
+    const chrMats = [1, 2, 3, 4, 5].map(makeChr);
+
+    // UI
+    const wopMat    = makeMesh('Blocks/UI/wop.webp',    0, INACTIVE_OPACITY).mat;
+    const lightsMat = makeMesh('Blocks/UI/lights.webp', 0, INACTIVE_OPACITY).mat;
+    const BLINK_PATTERN = [1, 0, 1, 0];
+    let blinkStep = 0;
+    const bonus = {
+      plusminusshared: makeMesh('Blocks/UI/Bonus/plusminusshared.webp', 0, INACTIVE_OPACITY).mat,
+      plusminusplus:   makeMesh('Blocks/UI/Bonus/plusminusplus.webp',   0, INACTIVE_OPACITY).mat,
+      numbershared:    makeMesh('Blocks/UI/Bonus/numbershared.webp',    0, INACTIVE_OPACITY).mat,
+      numberone:       makeMesh('Blocks/UI/Bonus/numberone.webp',       0, INACTIVE_OPACITY).mat,
+      numbertwo:       makeMesh('Blocks/UI/Bonus/numbertwo.webp',       0, INACTIVE_OPACITY).mat,
+      zerotwo:         makeMesh('Blocks/UI/Bonus/zerotwo.webp',         0, INACTIVE_OPACITY).mat,
+      zeroone:         makeMesh('Blocks/UI/Bonus/zeroone.webp',         0, INACTIVE_OPACITY).mat,
+    };
+    const BONUS_LAYERS = {
+      minus100: ['plusminusshared', 'numberone', 'numbershared', 'zerotwo', 'zeroone'],
+      plus20:   ['plusminusplus', 'plusminusshared', 'numbertwo', 'numbershared', 'zeroone'],
+      plus100:  ['plusminusplus', 'plusminusshared', 'numberone', 'numbershared', 'zerotwo', 'zeroone'],
+    };
+
+    function showBonus(type) {
+      const keys = BONUS_LAYERS[type];
+      Object.values(bonus).forEach(m => { m.opacity = INACTIVE_OPACITY; });
+      keys.forEach(k => { bonus[k].opacity = ACTIVE_OPACITY; });
+      setTimeout(() => { keys.forEach(k => { bonus[k].opacity = INACTIVE_OPACITY; }); }, BEAT_MS * 2);
+    }
+
+    const isAM = new Date().getHours() < 12;
+    makeMesh('Blocks/UI/am.webp', 0, isAM ? ACTIVE_OPACITY : INACTIVE_OPACITY);
+    makeMesh('Blocks/UI/pm.webp', 0, isAM ? INACTIVE_OPACITY : ACTIVE_OPACITY);
+
+    const toneMat  = makeMesh('Blocks/UI/tone.webp', 0, INACTIVE_OPACITY).mat;
+    const life1Mat = makeMesh('Blocks/UI/lives/life1.webp', 0, INACTIVE_OPACITY).mat;
+    const life2Mat = makeMesh('Blocks/UI/lives/life2.webp', 0, INACTIVE_OPACITY).mat;
+    const life3Mat = makeMesh('Blocks/UI/lives/life3.webp', 0, INACTIVE_OPACITY).mat;
+    const pauseMat = makeMesh('Blocks/UI/pauseplay/pause.webp', 0, INACTIVE_OPACITY).mat;
+    const playMat  = makeMesh('Blocks/UI/pauseplay/play.webp',  0, INACTIVE_OPACITY).mat;
+
+    const missMat = makeMesh('Blocks/UI/misstext.webp', 0, INACTIVE_OPACITY).mat;
+
+    function blinkMiss() {
+      const half = BEAT_MS / 2;
+      missMat.opacity = ACTIVE_OPACITY;
+      setTimeout(() => { missMat.opacity = INACTIVE_OPACITY; }, half);
+      setTimeout(() => { missMat.opacity = ACTIVE_OPACITY;   }, half * 2);
+      setTimeout(() => { missMat.opacity = INACTIVE_OPACITY; }, half * 3);
+    }
+
+    // GO
+    const goChrMat = makeMesh('Blocks/GO/gochr.webp', 0, INACTIVE_OPACITY).mat;
+    const goTxtMat = makeMesh('Blocks/GO/gotxt.webp', 0, INACTIVE_OPACITY).mat;
+
+    // ── TIERS ─────────────────────────────────────────────
+    function loadTierSets(tierNum, defs) {
+      return defs.map(([folder, shared, bun, bottle]) => {
+        const base = `Blocks/Tier/Tier${tierNum}/${folder}`;
+        return {
+          shared: makeMesh(`${base}/${shared}.webp`, 0, INACTIVE_OPACITY).mat,
+          bun:    makeMesh(`${base}/${bun}.webp`,    0, INACTIVE_OPACITY).mat,
+          bottle: makeMesh(`${base}/${bottle}.webp`, 0, INACTIVE_OPACITY).mat,
+        };
+      });
+    }
+
+    const tierSets = [
+      null, // index 0 unused
+      loadTierSets(1, [
+        ['Tier1Set1', 'tier1set1shared', 'tier1set1bun', 'tier1set1bottle'],
+        ['Tier1Set2', 'tier1set2shared', 'tier1set2bun', 'tier1set2bottle'],
+        ['Tier1Set3', 'tier1set3shared', 'tier1set3bun', 'tier1set3bottle'],
+        ['Tier1Set4', 'tier1set4shared', 'tier1set4bun', 'tier1set4bottle'],
+      ]),
+      loadTierSets(2, [
+        ['Tier2Set1', 'tier2set1shared', 'tier2set1bun', 'tier2set1bottle'],
+        ['Tier2Set2', 'tier2set2shared', 'tier2set2bun', 'tier2set2bottle'],
+        ['Tier2Set3', 'tier2set3shared', 'tier2set3bun', 'tier2set3bottle'],
+        ['Tier2Set4', 'tier2set4shared', 'tier2set4bun', 'tier2set4bottle'],
+      ]),
+      loadTierSets(3, [
+        ['Tier3Set1', 'tier3set1Shared', 'tier3set1bun', 'tier3set1Bottle'],
+        ['Tier3Set2', 'tier3set2shared', 'tier3set2bun', 'tier3set2bottle'],
+        ['Tier3Set3', 'tier3set3shared', 'tier3set3bun', 'tier3set3bottle'],
+        ['Tier3Set4', 'tier3set4shared', 'tier3set4bun', 'tier3set4bottle'],
+      ]),
+      loadTierSets(4, [
+        ['Tier4Set1', 'tier4set1shared', 'tier4set1bun', 'tier4set1bottle'],
+        ['Tier4Set2', 'tier4set2shared', 'tier4set2bun', 'tier4set2bottle'],
+        ['Tier4Set3', 'tier4set3shared', 'tier4set3bun', 'tier4set3bottle'],
+        ['Tier4Set4', 'tier4set4shared', 'tier4set4bun', 'tier4set4bottle'],
+      ]),
+      loadTierSets(5, [
+        ['Tier5Set1', 'tier5set1shared', 'tier5set1bun', 'tier5set1bottle'],
+        ['Tier5Set2', 'tier5set2shared', 'tier5set2bun', 'tier5set2bottle'],
+        ['Tier5Set3', 'tier5set3shared', 'tier5set3bun', 'tier5set3bottle'],
+        ['Tier5Set4', 'tier5set4shared', 'tier5set4bun', 'tier5set4bottle'],
+      ]),
+      loadTierSets(6, [
+        ['Tier6Set1', 'tier6set1shared', 'tier6set1bun', 'tier6set1bottle'],
+        ['Tier6Set2', 'tier6set2shared', 'tier6set2bun', 'tier6set2bottle'],
+        ['Tier6Set3', 'tier6set3shared', 'tier6set3bun', 'tier6set3bottle'],
+        ['Tier6Set4', 'tier6set4shared', 'tier6set4bun', 'tier6set4bottle'],
+      ]),
+      loadTierSets(7, [
+        ['Tier7Set1', 'tier7set1shared', 'tier7set1bun', 'tier7set1bottle'],
+        ['Tier7Set2', 'tier7set2shared', 'tier7set2bun', 'tier7set2bottle'],
+        ['Tier7Set3', 'tier7set3shared', 'tier7set3bun', 'tier7set3bottle'],
+        ['Tier7Set4', 'tier7set4shared', 'tier7set4bun', 'tier7set4bottle'],
+        ['Tier7Set5', 'tier7set5shared', 'tier7set5bun', 'tier7set5bottle'],
+      ]),
+      loadTierSets(8, [
+        ['Tier8Set1', 'tier8set1shared', 'tier8set1bun', 'tier8set1bottle'],
+        ['Tier8Set2', 'tier8set2shared', 'tier8set2bun', 'tier8set2bottle'],
+        ['Tier8Set3', 'tier8set3shared', 'tier8set3bun', 'tier8set3bottle'],
+        ['Tier8Set4', 'tier8set4shared', 'tier8set4bun', 'tier8set4bottle'],
+        ['Tier8Set5', 'tier8set5shared', 'tier8set5bun', 'tier8set5bottle'],
+      ]),
+    ];
+
+    // Fall (per character: shock, fallchar, stars)
+    const fallMats = [1, 2, 3, 4, 5].map(n => ({
+      shock: makeMesh(`Blocks/Fall/Char${n}/fallshock${n}.webp`, 0, INACTIVE_OPACITY).mat,
+      char:  makeMesh(`Blocks/Fall/Char${n}/fallchar${n}.webp`,  0, INACTIVE_OPACITY).mat,
+      stars: makeMesh(`Blocks/Fall/Char${n}/fallstars${n}.webp`, 0, INACTIVE_OPACITY).mat,
+    }));
+    let isFalling = false;
+    let isGameOver = false;
+    let gameOverTierMats = [];
+    let boltsTimer = null;
+    let boltsEndTime = 0;
+
+    function showBolts(duration) {
+      if (boltsTimer) clearTimeout(boltsTimer);
+      chrMats.forEach(c => { c.bolts.opacity = INACTIVE_OPACITY; });
+      chrMats[selectedChar].bolts.opacity = ACTIVE_OPACITY;
+      boltsEndTime = performance.now() + duration;
+      boltsTimer = setTimeout(() => {
+        chrMats[selectedChar].bolts.opacity = INACTIVE_OPACITY;
+        boltsTimer = null;
+      }, duration);
+    }
+
+    let tearsTimer = null;
+    let tearsEndTime = 0;
+
+    function showTears(duration) {
+      if (tearsTimer) clearTimeout(tearsTimer);
+      chrMats.forEach(c => { c.tears.opacity = INACTIVE_OPACITY; });
+      chrMats[selectedChar].tears.opacity = ACTIVE_OPACITY;
+      tearsEndTime = performance.now() + duration;
+      tearsTimer = setTimeout(() => {
+        chrMats[selectedChar].tears.opacity = INACTIVE_OPACITY;
+        tearsTimer = null;
+      }, duration);
+    }
+    let excActive = false;
+
+    function setExc(on) {
+      excActive = on;
+      chrMats[selectedChar].exc.opacity = on ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+    }
+
+    function triggerFall() {
+      if (isFalling) return;
+      isFalling = true;
+      const f = fallMats[selectedChar];
+      const c = chrMats[selectedChar];
+      const half = BEAT_MS / 2;
+
+      // Hide normal character
+      c.shared.opacity = c.walk1.opacity = c.walk2.opacity = c.exc.opacity = INACTIVE_OPACITY;
+
+      // All three start together; shock turns off after half a beat
+      f.shock.opacity = ACTIVE_OPACITY;
+      f.char.opacity  = ACTIVE_OPACITY;
+      f.stars.opacity = ACTIVE_OPACITY;
+      setTimeout(() => { f.shock.opacity = INACTIVE_OPACITY; }, half);
+
+      // After 1 beat: fallchar + stars off, either game over or blink phase
+      setTimeout(() => {
+        if (lives === 0) {
+          isGameOver = true;
+          setTimeout(showGameOver, 2000); // show form after 2s
+          gameOverTierMats = [];
+          for (let t = 1; t <= 8; t++) {
+            tierSets[t].forEach(s => {
+              [s.shared, s.bun, s.bottle].forEach(m => {
+                if (m.opacity === ACTIVE_OPACITY) gameOverTierMats.push(m);
+              });
+            });
+          }
+          goChrMat.opacity = goTxtMat.opacity = INACTIVE_OPACITY;
+          snowMats.forEach(m => { m.opacity = INACTIVE_OPACITY; });
+          return;
+        }
+
+        f.char.opacity  = INACTIVE_OPACITY;
+        f.stars.opacity = INACTIVE_OPACITY;
+        showBolts(BEAT_MS);
+        setTimeout(() => { c.shared.opacity = c.walk1.opacity = ACTIVE_OPACITY;   }, 0);
+        setTimeout(() => { c.shared.opacity = c.walk1.opacity = INACTIVE_OPACITY; }, half);
+        setTimeout(() => { c.shared.opacity = c.walk1.opacity = ACTIVE_OPACITY;   }, half * 2);
+        setTimeout(() => { c.shared.opacity = c.walk1.opacity = INACTIVE_OPACITY; }, half * 3);
+        setTimeout(() => { c.shared.opacity = c.walk1.opacity = ACTIVE_OPACITY; isFalling = false; }, half * 4);
+      }, BEAT_MS);
+    }
+
+    // Digits (5 digits × 7 segments a–g)
+    const SEGMENTS = ['a','b','c','d','e','f','g'];
+    const digitMats = [1,2,3,4,5].map(n =>
+      Object.fromEntries(SEGMENTS.map(s => [
+        s, makeMesh(`Blocks/Digits/Digit${n}/Digit${n}-${s}.webp`, 0, INACTIVE_OPACITY).mat
+      ]))
+    );
+    const dotsMat = makeMesh('Blocks/Digits/dots.webp', 0, INACTIVE_OPACITY).mat;
+
+    // 7-segment map: which segments are on for each digit 0–9
+    const SEG_MAP = {
+      0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg',
+      5: 'acdfg',  6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg'
+    };
+
+    function setDigit(digitIndex, value) {
+      const on = new Set(SEG_MAP[value] || '');
+      SEGMENTS.forEach(s => {
+        digitMats[digitIndex][s].opacity = on.has(s) ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+      });
+    }
+
+    // Score
+    let score = 0;
+
+    let djUnlocked = false;
+    let goUnlocked = false;
+
+    function blinkScore() {
+      const half = BEAT_MS / 2;
+      const allSegs = digitMats.flatMap(d => Object.values(d));
+      const snapshot = allSegs.map(m => m.opacity);
+      allSegs.forEach(m => { m.opacity = INACTIVE_OPACITY; });
+      setTimeout(() => { allSegs.forEach((m, i) => { m.opacity = snapshot[i]; }); }, half);
+      setTimeout(() => { allSegs.forEach(m => { m.opacity = INACTIVE_OPACITY; }); }, half * 2);
+      setTimeout(() => { allSegs.forEach((m, i) => { m.opacity = snapshot[i]; }); }, half * 3);
+    }
+
+    function updateScore(delta) {
+      const prev = score;
+      score = Math.max(0, score + delta);
+      _sv(delta); // shadow tracks independently
+      const s = Math.min(score, 99999).toString().padStart(5, '0');
+      for (let i = 0; i < 5; i++) setDigit(i, parseInt(s[i]));
+
+      const prevTier = Math.floor(prev  / 2000);
+      const newTier  = Math.floor(score / 2000);
+      if (newTier > prevTier) {
+        BPM    += 5 * (newTier - prevTier);
+        BEAT_MS = 60000 / BPM;
+        blinkScore();
+      }
+
+      if (!djUnlocked && score >= 6000) {
+        djUnlocked = true;
+        djSharedMat.opacity     = ACTIVE_OPACITY;
+        djHandSharedMat.opacity = ACTIVE_OPACITY;
+        djHandTopMat.opacity    = ACTIVE_OPACITY;
+      }
+      if (!goUnlocked && score >= 12000) {
+        goUnlocked = true;
+        goChrMat.opacity = ACTIVE_OPACITY;
+      }
+    }
+
+    updateScore(0); // show 00000
+
+    // Overlay (on top of everything — never affected by game logic)
+
+    // ── TIER GAME LOGIC ───────────────────────────────────
+    let lives = 1;
+    let nextSpawnIn = 4;
+    const fallingElements = []; // { tier, set, type: 'bun'|'bottle' }
+
+    // Set mapping Tier6 (sets 0-3) → Tier7 (sets 0-4)
+    function t6ToT7Set(set) {
+      if (set === 0) return Math.random() < 0.5 ? 0 : 1;
+      if (set === 1) return Math.random() < 0.5 ? 1 : 2;
+      if (set === 2) return Math.random() < 0.5 ? 2 : 3;
+      if (set === 3) return Math.random() < 0.5 ? 3 : 4;
+      return set;
+    }
+
+    function updateLivesDisplay() {
+      life1Mat.opacity = lives >= 1 ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+      life2Mat.opacity = lives >= 2 ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+      life3Mat.opacity = lives >= 3 ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+    }
+
+    function advanceTierElements() {
+      // Clear all tier mats
+      for (let t = 1; t <= 8; t++) {
+        tierSets[t].forEach(s => {
+          s.shared.opacity = s.bun.opacity = s.bottle.opacity = INACTIVE_OPACITY;
+        });
+      }
+
+      // Advance each element
+      for (let i = fallingElements.length - 1; i >= 0; i--) {
+        const el = fallingElements[i];
+        const prevTier = el.tier;
+        el.tier++;
+        if (prevTier === 6) el.set = t6ToT7Set(el.set);
+        // T7→T8: set stays same (both have 5 sets)
+
+        if (el.tier > 8) {
+          if (!isGameOver && el.set === selectedChar) {
+            if (el.type === 'bottle') {
+              if (lives < 3) {
+                lives++;
+                updateLivesDisplay();
+              } else {
+                showBonus('plus100');
+                updateScore(100);
+              }
+              wopMat.opacity = ACTIVE_OPACITY;
+              showBolts(BEAT_MS);
+              setTimeout(() => {
+                wopMat.opacity    = INACTIVE_OPACITY;
+                lightsMat.opacity = ACTIVE_OPACITY;
+                setTimeout(() => { lightsMat.opacity = INACTIVE_OPACITY; }, BEAT_MS * 1.5);
+              }, BEAT_MS);
+            }
+            if (el.type === 'bun' && lives > 0) { lives--; updateLivesDisplay(); updateScore(-100); showBonus('minus100'); setExc(false); triggerFall(); blinkMiss(); }
+          }
+          fallingElements.splice(i, 1);
+          continue;
+        }
+      }
+
+      // Trigger exc when a bun is at tier 7 in the same lane (skip during fall/game over)
+      if (!isFalling && !isGameOver) {
+        for (const el of fallingElements) {
+          if (el.tier === 7 && el.type === 'bun' && el.set === selectedChar) setExc(true);
+        }
+      }
+
+      // Render active elements
+      for (const el of fallingElements) {
+        const s = tierSets[el.tier][el.set];
+        if (!s) continue;
+        s.shared.opacity = ACTIVE_OPACITY;
+        if (el.type === 'bun')    s.bun.opacity    = ACTIVE_OPACITY;
+        if (el.type === 'bottle') s.bottle.opacity = ACTIVE_OPACITY;
+      }
+
+      // Spawn
+      nextSpawnIn--;
+      if (nextSpawnIn <= 0) {
+        if (Math.random() < SPAWN_CHANCE) {
+          fallingElements.push({
+            tier: 1,
+            set:  Math.floor(Math.random() * 4),
+            type: Math.random() < BOTTLE_CHANCE ? 'bottle' : 'bun',
+          });
+        }
+        nextSpawnIn = SPAWN_MIN + Math.floor(Math.random() * (SPAWN_MAX - SPAWN_MIN + 1));
+      }
+    }
+
+    // ── CHARACTER SELECTION ───────────────────────────────
+    let selectedChar = 0;
+
+    function applyCharSelection() {
+      chrMats.forEach((c, i) => {
+        const on = i === selectedChar;
+        c.shared.opacity = on ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+        c.exc.opacity    = INACTIVE_OPACITY;
+        c.walk1.opacity  = on ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+        c.walk2.opacity  = INACTIVE_OPACITY;
+      });
+      const bunAhead = fallingElements.some(el =>
+        (el.tier === 7 || el.tier === 8) && el.type === 'bun' && el.set === selectedChar
+      );
+      excActive = false;
+      if (bunAhead) setExc(true);
+    }
+
+    function tryMoveChar(delta) {
+      if (isFalling || isPaused) return;
+      const next = selectedChar + delta;
+      if (next < 0 || next > 4) return;
+      const dodged = fallingElements.some(el => el.tier === 8 && el.type === 'bun' && el.set === selectedChar);
+      const remainingBolts = boltsTimer ? boltsEndTime - performance.now() : 0;
+      const remainingTears = tearsTimer ? tearsEndTime - performance.now() : 0;
+      selectedChar = next;
+      applyCharSelection();
+      if (remainingBolts > 0) showBolts(remainingBolts);
+      if (dodged) {
+        updateScore(20);
+        showBonus('plus20');
+        showTears(BEAT_MS);
+      } else if (remainingTears > 0) {
+        showTears(remainingTears);
+      }
+    }
+
+    function tapButton(btn, fn) {
+      let down = false;
+      btn.addEventListener('pointerdown', () => { down = true; btn.style.opacity = '0.4'; });
+      btn.addEventListener('pointerup',   () => { if (down) { down = false; btn.style.opacity = '1'; fn(); } });
+      btn.addEventListener('pointercancel', () => { down = false; btn.style.opacity = '1'; });
+      btn.addEventListener('pointerleave', () => { if (down) { down = false; btn.style.opacity = '1'; } });
+    }
+    tapButton(document.getElementById('chr-prev'), () => tryMoveChar(-1));
+    tapButton(document.getElementById('chr-next'), () => tryMoveChar(1));
+
+    // ── PAUSE STATE ───────────────────────────────────────
+    let isPaused = false;
+
+    document.getElementById('pause-btn').addEventListener('click', () => {
+      isPaused = !isPaused;
+      pauseMat.opacity = isPaused ? INACTIVE_OPACITY : ACTIVE_OPACITY;
+      playMat.opacity  = isPaused ? ACTIVE_OPACITY   : INACTIVE_OPACITY;
+
+      if (isPaused) {
+        const active = layers.filter(l => l.opacity === ACTIVE_OPACITY);
+        active.forEach(l => l.opacity = INACTIVE_OPACITY);
+        const half = BEAT_MS / 2;
+        setTimeout(() => active.forEach(l => l.opacity = ACTIVE_OPACITY),     half);
+        setTimeout(() => active.forEach(l => l.opacity = INACTIVE_OPACITY), half * 2);
+        setTimeout(() => active.forEach(l => l.opacity = ACTIVE_OPACITY),   half * 3);
+      } else {
+        lastBeat = null;
+      }
+    });
+
+    // ── BPM SEQUENCE ──────────────────────────────────────
+    const MAX_RUNNERS   = 6;
+    const RUNNER_OFFSET = 3;
+    const runners = [];
+    let beatCount = 0, lastBeat = null;
+
+    function applyBeat() {
+      if (beatCount === 0) {
+        bgAlways.forEach(m => m.opacity = ACTIVE_OPACITY);
+        toneMat.opacity         = ACTIVE_OPACITY;
+        life1Mat.opacity        = ACTIVE_OPACITY;
+        pauseMat.opacity        = ACTIVE_OPACITY;
+        chrMats[selectedChar].shared.opacity = ACTIVE_OPACITY;
+      }
+
+      // Runners (stop on game over)
+      if (!isGameOver) {
+        if (beatCount % RUNNER_OFFSET === 0 && runners.length < MAX_RUNNERS) runners.push(0);
+        const activeSet = new Set(runners);
+        planes.forEach((p, i) => {
+          p.mat.opacity = activeSet.has(i) ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+        });
+        for (let r = 0; r < runners.length; r++) runners[r] = (runners[r] + 1) % 19;
+      }
+
+      // Wop + Lights + Fireest blink intro
+      if (blinkStep < BLINK_PATTERN.length) {
+        const op = BLINK_PATTERN[blinkStep] ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+        wopMat.opacity = lightsMat.opacity = fireestMat.opacity = op;
+        blinkStep++;
+      } else {
+        wopMat.opacity = lightsMat.opacity = INACTIVE_OPACITY;
+        fireestMat.opacity = ACTIVE_OPACITY;
+      }
+
+      // Stools — stop flipping on game over
+      if (!isGameOver) {
+        stoolMats.forEach((m, i) => {
+          if (Math.random() < STOOL_FLIP_PROB) {
+            const currentOff = stoolOn.filter(s => !s).length;
+            if (stoolOn[i] && currentOff >= 2) { /* skip */ }
+            else stoolOn[i] = !stoolOn[i];
+          }
+          m.opacity = stoolOn[i] ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+        });
+
+        // Snowflakes
+        snowMats.forEach((m, i) => { m.opacity = i === snowIndex ? ACTIVE_OPACITY : INACTIVE_OPACITY; });
+        snowIndex = (snowIndex + 1) % 4;
+      }
+
+      // Game over blinking
+      if (isGameOver) {
+        const f = fallMats[selectedChar];
+        const beat = beatCount % 2 === 0;
+        f.stars.opacity   = beat ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+        wopMat.opacity    = beat ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+        lightsMat.opacity = beat ? INACTIVE_OPACITY : ACTIVE_OPACITY;
+        gameOverTierMats.forEach(m => { m.opacity = beat ? ACTIVE_OPACITY : INACTIVE_OPACITY; });
+      }
+
+      // Selected character walk (skip during fall)
+      if (!isFalling) {
+        const walkA = beatCount % 2 === 0;
+        const c = chrMats[selectedChar];
+        c.walk1.opacity = walkA ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+        c.walk2.opacity = walkA ? INACTIVE_OPACITY : ACTIVE_OPACITY;
+      }
+
+      if (!isGameOver) {
+        // Go txt: 3 ON, 1 OFF (only when go unlocked)
+        if (goUnlocked) goTxtMat.opacity = beatCount % 4 === 3 ? INACTIVE_OPACITY : ACTIVE_OPACITY;
+
+        // DJ hand + drops (only when unlocked)
+        if (djUnlocked) {
+          const handTop = Math.floor(beatCount / 2) % 2 === 0;
+          djHandTopMat.opacity    = handTop ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+          djHandBottomMat.opacity = handTop ? INACTIVE_OPACITY : ACTIVE_OPACITY;
+
+          djWavesMat.opacity = beatCount % 4 === 0 ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+
+          djDropMats.forEach((m, i) => {
+            m.opacity = (i === djDropIndex || i === (djDropIndex + 1) % 3) ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+          });
+          djDropIndex = (djDropIndex + 1) % 3;
+        }
+
+        // Tier elements (advance every beat)
+        advanceTierElements();
+      }
+
+      // MISS reveal (removed - now blinks on hit via blinkMiss())
+      if (false) {
+      }
+
+      if (!isGameOver && !isFalling) updateScore(5);
+      beatCount++;
+    }
+
+    // ── RENDER LOOP ───────────────────────────────────────
+    function animate(t) {
+      requestAnimationFrame(animate);
+
+      if (!isPaused) {
+        if (lastBeat === null) { lastBeat = t; applyBeat(); }
+        else while (t - lastBeat >= BEAT_MS) { lastBeat += BEAT_MS; applyBeat(); }
+      }
+
+      const { x, y, w, h } = drawRect();
+
+      // Position top SVG to sit on top edge of game rect, full width
+      const topBar = document.getElementById('top-bar');
+      const topH = w * (235.59 / 1920); // preserve SVG aspect ratio
+      topBar.style.left   = x + 'px';
+      topBar.style.width  = w + 'px';
+      topBar.style.top    = (y - topH) + 'px';
+      topBar.style.height = topH + 'px';
+
+      // Position bottom buttons below game rect
+      const bottomBar = document.getElementById('bottom-bar');
+      const btnSize = w * 0.20;
+      const arrowH = btnSize * 0.333;
+      const arrowW = arrowH * (40 / 60);
+      // Size circle buttons only (not center pill buttons)
+      bottomBar.querySelectorAll('#chr-prev, #chr-next').forEach(b => {
+        b.style.width = btnSize + 'px'; b.style.height = btnSize + 'px';
+      });
+      // Size arrows
+      bottomBar.querySelectorAll('.arrow').forEach(a => {
+        a.style.width = arrowW + 'px'; a.style.height = arrowH + 'px';
+      });
+      // Size center pill buttons
+      const pillFontSize = Math.max(w * 0.028, 8);
+      const pillPad = pillFontSize * 0.8;
+      bottomBar.querySelectorAll('#center-btns button').forEach(b => {
+        b.style.padding = pillPad + 'px ' + (pillPad * 4) + 'px';
+        b.style.borderWidth = Math.max(w * 0.012, 3) + 'px';
+      });
+      bottomBar.querySelectorAll('.pill-wrap span').forEach(s => {
+        s.style.fontSize = pillFontSize + 'px';
+      });
+      bottomBar.style.left  = x + 'px';
+      bottomBar.style.width = w + 'px';
+      bottomBar.style.top   = (y + h + 12) + 'px';
+
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+      // White background inside game rect (so canvas buffer has it for 3D texture)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x, y, w, h);
+
+      for (const layer of layers) {
+        if (layer.opacity === INACTIVE_OPACITY) continue;
+        if (!layer.img) continue;
+        ctx.globalAlpha = layer.opacity;
+        ctx.drawImage(layer.img, x, y, w, h);
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth   = 1;
+      ctx.strokeRect(x, y, w, h);
+    }
+    requestAnimationFrame(animate);
+
+    // ── RESIZE ────────────────────────────────────────────
+    window.addEventListener('resize', resizeCanvas);
+
+    // ── LEADERBOARD / GAME OVER SCREENS ─────────────────
+    const screenLB   = document.getElementById('screen-leaderboard');
+    const screenGO   = document.getElementById('screen-gameover');
+    const lbBody     = document.getElementById('lb-body');
+    const goScore    = document.getElementById('go-score');
+    const goUsername  = document.getElementById('go-username');
+    const goEmail    = document.getElementById('go-email');
+    const goMsg      = document.getElementById('go-msg');
+
+    // Start paused, show leaderboard
+    isPaused = true;
+
+    async function fetchLeaderboard() {
+      try {
+        const res = await fetch(APPS_SCRIPT_URL);
+        const data = await res.json();
+        if (!data.leaderboard || data.leaderboard.length === 0) {
+          lbBody.innerHTML = '<tr><td colspan="3">No scores yet</td></tr>';
+          return;
+        }
+        lbBody.innerHTML = data.leaderboard.map((r, i) =>
+          `<tr><td>${i + 1}</td><td>${r.username}</td><td>${r.score}</td></tr>`
+        ).join('');
+      } catch (e) {
+        lbBody.innerHTML = '<tr><td colspan="3">Could not load</td></tr>';
+      }
+    }
+
+    async function submitScore(username, email, sc) {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ username, email, score: sc })
+      });
+      return res.json();
+    }
+
+    // Fetch leaderboard on load
+    fetchLeaderboard();
+
+    // PLAY button
+    document.getElementById('btn-play').addEventListener('click', () => {
+      screenLB.classList.add('hidden');
+      isPaused = false;
+      lastBeat = null;
+      beatCount = 0;
+    });
+
+    // Show game over screen (called from game over logic)
+    function showGameOver() {
+      goScore.textContent = score;
+      goMsg.textContent = '';
+      goUsername.value = '';
+      goEmail.value = '';
+      screenGO.classList.remove('hidden');
+    }
+
+    // SUBMIT button
+    document.getElementById('btn-submit').addEventListener('click', async () => {
+      const u = goUsername.value.trim();
+      const e = goEmail.value.trim();
+      if (!u || !e) { goMsg.textContent = 'Fill in both fields'; return; }
+      goMsg.textContent = 'Submitting...';
+      try {
+        if (score === _gv()) {
+          // Score legit — invia davvero
+          await submitScore(u, e, score);
+        } else {
+          // Score manipolato — finge di inviare
+          await new Promise(r => setTimeout(r, 800));
+        }
+        goMsg.textContent = 'Score submitted!';
+        document.getElementById('btn-submit').style.display = 'none';
+      } catch (err) {
+        goMsg.textContent = 'Error, try again';
+      }
+    });
+
+    // PLAY AGAIN button
+    document.getElementById('btn-replay').addEventListener('click', () => {
+      screenGO.classList.add('hidden');
+      // Reset game state
+      score = 0; _rv(); lives = 1; beatCount = 0; isGameOver = false; isFalling = false;
+      lastBeat = null; isPaused = false;
+      BPM = 120; BEAT_MS = 60000 / BPM;
+      updateScore(0);
+      updateLivesDisplay();
+      document.getElementById('btn-submit').style.display = '';
+      fetchLeaderboard();
+    });
+
+  </script>
+
+  <!-- ── THREE.JS: game canvas as texture on 3D screen ──── -->
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.163.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.163.0/examples/jsm/" } }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const gameCanvas = document.getElementById('canvas');
+
+    // Create Three.js renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0xc8c8c3);
+    renderer.domElement.id = 'three-canvas';
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+
+    // Perspective camera for 3D orbit
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const camera = new THREE.PerspectiveCamera(45, vw / vh, 0.1, 1000);
+    camera.position.set(0, 0, vh * 1.1);
+    camera.lookAt(0, 0, 0);
+
+    // OrbitControls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 0, 0);
+
+    // Use game canvas directly as texture
+    const texture = new THREE.CanvasTexture(gameCanvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    // Plane sized to match the game rect
+    const IMG_AR = 1241 / 1754;
+    const PLANE_H = 5 / 3;
+    const topRatio = 235.59 / 1920;
+    const btnRatio = 0.20;
+
+    function getGameRect() {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const gapTop = 16, gapBot = 12, padBot = 24;
+      const maxH = (vh - gapTop - gapBot - padBot) / (1 + IMG_AR * (topRatio + btnRatio));
+      const h = Math.min(vh * PLANE_H / 2 - 10, maxH);
+      const w = h * IMG_AR;
+      return { w, h };
+    }
+
+    const rect = getGameRect();
+    const planeGeo = new THREE.PlaneGeometry(rect.w, rect.h);
+
+    // The texture shows the full canvas; we need UV to show just the game rect
+    const screenMat = new THREE.MeshBasicMaterial({ map: texture });
+    const plane = new THREE.Mesh(planeGeo, screenMat);
+    scene.add(plane);
+
+    function updateUVs() {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const gapTop = 16, gapBot = 12, padBot = 24;
+      const maxH = (vh - gapTop - gapBot - padBot) / (1 + IMG_AR * (topRatio + btnRatio));
+      const h = Math.min(vh * PLANE_H / 2 - 10, maxH);
+      const w = h * IMG_AR;
+      const topH = w * topRatio;
+      const totalH = topH + gapTop + h + gapBot + w * btnRatio + padBot;
+      const startY = (vh - totalH) / 2;
+      const x = (vw - w) / 2;
+      const y = startY + topH + gapTop;
+
+      // Canvas buffer is DPR-scaled, but UV is 0-1 based on canvas.width/height
+      const cw = gameCanvas.width, ch = gameCanvas.height;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const u0 = (x * dpr) / cw;
+      const u1 = ((x + w) * dpr) / cw;
+      const v0 = 1 - ((y + h) * dpr) / ch; // flip Y (canvas Y is top-down, UV is bottom-up)
+      const v1 = 1 - (y * dpr) / ch;
+
+      const uv = plane.geometry.attributes.uv;
+      // PlaneGeometry UV layout: [0,1], [1,1], [0,0], [1,0]
+      uv.setXY(0, u0, v1);
+      uv.setXY(1, u1, v1);
+      uv.setXY(2, u0, v0);
+      uv.setXY(3, u1, v0);
+      uv.needsUpdate = true;
+
+      // Update plane size
+      const scale = w / rect.w;
+      plane.scale.set(scale, scale, 1);
+    }
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      texture.needsUpdate = true;
+      updateUVs();
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(animate3D);
+
+    window.addEventListener('resize', () => {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      camera.aspect = vw / vh;
+      camera.position.z = vh * 1.1;
+      camera.updateProjectionMatrix();
+      renderer.setSize(vw, vh);
+    });
+  </script>
+
+</body>
+</html>
