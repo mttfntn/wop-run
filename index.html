@@ -7,7 +7,7 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #c8c8c3; touch-action: none; }
-    canvas#canvas { display: block; position: fixed; top: 0; left: -9999px; }
+    canvas#canvas { display: block; position: fixed; top: 0; left: -9999px; filter: blur(0.15px) contrast(4); }
     canvas#three-canvas { display: block; position: fixed; top: 0; left: 0; z-index: 1; }
 
     /* ── BOTTOM BUTTONS ──────────────────────────────── */
@@ -852,9 +852,11 @@
 
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-      // White background inside game rect (so canvas buffer has it for 3D texture)
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x, y, w, h);
+      // White background only needed for 3D texture mode
+      if (window.__THREE_D_MODE) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, y, w, h);
+      }
 
       for (const layer of layers) {
         if (layer.opacity === INACTIVE_OPACITY) continue;
