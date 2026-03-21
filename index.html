@@ -144,6 +144,7 @@
     function _rv() { _v = 0 ^ _m; } // reset shadow
 
     const MOBILE_ONLY      = false;
+    const THREE_D_MODE     = false;
     const ACTIVE_OPACITY   = 1.0;
     const INACTIVE_OPACITY = 0;
     let BPM                = 120;
@@ -164,6 +165,13 @@
     // ── CANVAS 2D SETUP ───────────────────────────────────
     const canvas = document.getElementById('canvas');
     const ctx    = canvas.getContext('2d');
+
+    // If 3D is off, show game canvas directly
+    if (!THREE_D_MODE) {
+      canvas.style.left = '0';
+      canvas.style.position = 'fixed';
+    }
+    window.__THREE_D_MODE = THREE_D_MODE;
 
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -966,6 +974,8 @@
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+    if (!window.__THREE_D_MODE) throw 'skip';
+
     const gameCanvas = document.getElementById('canvas');
 
     // Create Three.js renderer
@@ -996,17 +1006,17 @@
     texture.magFilter = THREE.LinearFilter;
 
     // Plane sized to match the game rect
-    const IMG_AR = 1241 / 1754;
-    const PLANE_H = 5 / 3;
+    const _AR = 1241 / 1754;
+    const _PH = 5 / 3;
     const topRatio = 235.59 / 1920;
     const btnRatio = 0.20;
 
     function getGameRect() {
       const vw = window.innerWidth, vh = window.innerHeight;
       const gapTop = 16, gapBot = 12, padBot = 24;
-      const maxH = (vh - gapTop - gapBot - padBot) / (1 + IMG_AR * (topRatio + btnRatio));
-      const h = Math.min(vh * PLANE_H / 2 - 10, maxH);
-      const w = h * IMG_AR;
+      const maxH = (vh - gapTop - gapBot - padBot) / (1 + _AR * (topRatio + btnRatio));
+      const h = Math.min(vh * _PH / 2 - 10, maxH);
+      const w = h * _AR;
       return { w, h };
     }
 
