@@ -1153,6 +1153,8 @@
     function center(str, w) { const pad = Math.max(0, w - str.length); const l = Math.floor(pad / 2); return ' '.repeat(l) + str + ' '.repeat(pad - l); }
     function line(w) { return '-'.repeat(w); }
 
+    let _pendingScore = null; // { username, score } to inject optimistically
+
     async function fetchLeaderboard() {
       const W = 41; // receipt grid width (matches ASCII art)
       const now = new Date();
@@ -1166,7 +1168,19 @@
       try {
         const res = await fetch(APPS_SCRIPT_URL);
         const data = await res.json();
-        const lb = (data.leaderboard || []).slice(0, 10);
+        let lb = data.leaderboard || [];
+        // Inject pending score optimistically
+        if (_pendingScore) {
+          const existing = lb.findIndex(r => r.username.toUpperCase() === _pendingScore.username.toUpperCase());
+          if (existing >= 0) {
+            if (_pendingScore.score > lb[existing].score) lb[existing].score = _pendingScore.score;
+          } else {
+            lb.push({ username: _pendingScore.username, score: _pendingScore.score });
+          }
+          lb.sort((a, b) => b.score - a.score);
+          _pendingScore = null;
+        }
+        lb = lb.slice(0, 10);
 
         for (let i = 0; i < 10; i++) {
           const num = String(i + 1).padStart(2) + '.';
@@ -1350,9 +1364,13 @@
       localStorage.setItem('woprun_email', e);
 
       // Submit in background (fire and forget)
+      const savedScore = score;
       if (score === _gv()) {
         submitScore(u, e, score).catch(() => {});
       }
+
+      // Inject score optimistically so it shows immediately
+      _pendingScore = { username: u, score: savedScore };
 
       // Prepare leaderboard (visible but positioned below, no transition yet)
       resetGame();
