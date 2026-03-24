@@ -17,8 +17,7 @@
     }
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; touch-action: none; }
-    canvas#canvas { display: block; position: fixed; top: 0; left: -9999px; filter: blur(0.15px) contrast(4); }
-    canvas#three-canvas { display: block; position: fixed; top: 0; left: 0; z-index: 1; }
+    canvas#canvas { display: block; position: fixed; top: 0; left: 0; filter: blur(0.15px) contrast(4); }
 
     /* ── BOTTOM BUTTONS ──────────────────────────────── */
     #bottom-bar {
@@ -78,12 +77,36 @@
     .overlay, .overlay input, .overlay button {
       font-family: 'OverusedGrotesk', sans-serif;
     }
+    #overlay-bg {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 49; background: rgb(200,200,195);
+      opacity: 0.55; transition: opacity 0.5s ease;
+      pointer-events: none;
+    }
+    #overlay-bg.fade-out { opacity: 0; }
+    #overlay-bg.gone { display: none; }
     .overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       z-index: 50; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: rgba(200,200,195,0.96);
+      background: transparent;
       font-family: 'OverusedGrotesk', sans-serif; color: #222;
+    }
+    .overlay .receipt, .overlay .btn {
+      transform: translateY(100vh) rotate(-2deg);
+      opacity: 1;
+      transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .overlay.show-in .receipt, .overlay.show-in .btn {
+      transform: translateY(0) rotate(-2deg);
+      opacity: 1;
+    }
+    .overlay.show-in .btn {
+      transition-delay: 0.15s;
+    }
+    .overlay.show-in.exit-up .receipt, .overlay.show-in.exit-up .btn,
+    .overlay.exit-up .receipt, .overlay.exit-up .btn {
+      transform: translateY(-120vh) rotate(-2deg);
     }
     .overlay.hidden { display: none; }
     .overlay h1 { font-size: 1.6rem; margin-bottom: 12px; }
@@ -98,26 +121,25 @@
       background: #fff; color: #222; outline: none;
     }
     .overlay .btn {
-      padding: 10px 32px; margin-top: 12px; border: 2px solid #222;
-      border-radius: 999px; background: #222; color: #fff;
+      padding: 10px 32px; margin-top: 12px; border: 2px solid #000;
+      border-radius: 999px; background: #000; color: #fff;
       font-size: 0.95rem; font-weight: 600; cursor: pointer;
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
-    .overlay .btn:active { opacity: 0.7; }
-    .overlay .btn-outline { background: none; color: #222; }
+    .overlay .btn:active { transform: scale(0.95); opacity: 0.8; }
+    .overlay .btn-outline { background: #000; color: #fff; }
     .overlay .score-big { font-size: 2.2rem; font-weight: 800; margin: 8px 0; }
     .overlay .loading { opacity: 0.5; font-size: 0.85rem; }
 
     /* ── RECEIPT ─────────────────────────────────────── */
     .receipt {
-      background: none;
+      background: #fff;
       color: #111;
       font-family: 'MerchantCopy', 'Courier New', monospace;
       position: relative;
       width: 92%; max-width: 400px;
       padding: 16px 22px 20px;
       text-align: center;
-      transform: rotate(-2deg);
       line-height: 1.0;
       letter-spacing: 0;
       overflow: hidden;
@@ -126,7 +148,7 @@
     .receipt::before {
       content: ''; position: absolute; inset: 0; z-index: 0;
       background: url('Texture.webp') center/cover;
-      filter: invert(1);
+      filter: invert(1); opacity: 0.5;
     }
     .receipt > * { position: relative; z-index: 1; }
     .receipt img.receipt-logo { width: 55%; margin-bottom: 4px; filter: url(#thermal); }
@@ -220,6 +242,7 @@
     </clipPath>
   </svg>
 
+  <div id="overlay-bg"></div>
   <!-- LEADERBOARD SCREEN (shown before game) -->
   <div id="screen-leaderboard" class="overlay">
     <div class="receipt">
@@ -236,7 +259,7 @@
 -----------------------------------------</pre>
       <pre id="lb-text-bot"></pre>
     </div>
-    <button class="btn" id="btn-play" style="margin-top:16px">PLAY</button>
+    <button class="btn" id="btn-play" style="margin-top:16px">GIOCA</button>
   </div>
 
   <!-- GAME OVER SCREEN (shown after game ends) -->
@@ -251,10 +274,7 @@
       </div>
       <pre id="go-receipt-bot"></pre>
     </div>
-    <div style="display:flex;gap:12px;margin-top:12px;position:relative;z-index:1">
-      <button class="btn" id="btn-submit">SUBMIT</button>
-      <button class="btn btn-outline" id="btn-replay">PLAY AGAIN</button>
-    </div>
+    <button class="btn" id="btn-avanti" style="margin-top:12px;position:relative;z-index:1">SALVA</button>
   </div>
 
   <!-- SPLASH SCREEN -->
@@ -297,7 +317,6 @@
     function _rv() { _v = 0 ^ _m; } // reset shadow
 
     const MOBILE_ONLY      = false;
-    const THREE_D_MODE     = false;
     const SHOW_SPLASH      = true;
     const BG_COLOR         = '#cec8c0';
     document.body.style.background = BG_COLOR;
@@ -354,12 +373,6 @@
     const canvas = document.getElementById('canvas');
     const ctx    = canvas.getContext('2d');
 
-    // If 3D is off, show game canvas directly
-    if (!THREE_D_MODE) {
-      canvas.style.left = '0';
-      canvas.style.position = 'fixed';
-    }
-    window.__THREE_D_MODE = THREE_D_MODE;
 
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -416,7 +429,10 @@
           if (i >= 100) {
             setTimeout(() => {
               splashEl.classList.add('hide');
-              setTimeout(() => { splashEl.style.display = 'none'; }, 700);
+              setTimeout(() => {
+                splashEl.style.display = 'none';
+                screenLB.classList.add('show-in');
+              }, 700);
             }, 300);
             return;
           }
@@ -681,7 +697,7 @@
       gameTimeout(() => {
         if (lives === 0) {
           isGameOver = true;
-          gameTimeout(showGameOver, 2000); // show form after 2s
+          gameTimeout(showGameOver, 500);
           gameOverTierMats = [];
           for (let t = 1; t <= 8; t++) {
             tierSets[t].forEach(s => {
@@ -1103,12 +1119,6 @@
 
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-      // White background only needed for 3D texture mode
-      if (window.__THREE_D_MODE) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x, y, w, h);
-      }
-
       for (const layer of layers) {
         if (layer.opacity === INACTIVE_OPACITY) continue;
         if (!layer.img) continue;
@@ -1243,15 +1253,24 @@
     fetchLeaderboard();
 
     // PLAY button
+    const overlayBg = document.getElementById('overlay-bg');
     document.getElementById('btn-play').addEventListener('click', () => {
+      screenLB.classList.remove('show-in');
       screenLB.classList.add('hidden');
+      overlayBg.classList.add('fade-out');
+      overlayBg.addEventListener('transitionend', () => { overlayBg.classList.add('gone'); }, { once: true });
+      resetGame();
       isPaused = false;
       lastBeat = null;
       beatCount = 0;
     });
 
     // Show game over screen (called from game over logic)
+    let _goShown = false;
     function showGameOver() {
+      if (_goShown) return;
+      _goShown = true;
+      overlayBg.classList.remove('gone', 'fade-out');
       const W = 32;
       function ctr(s) { const p = Math.max(0, W - s.length); const l = Math.floor(p/2); return ' '.repeat(l) + s + ' '.repeat(p-l); }
       function ln() { return '-'.repeat(W); }
@@ -1293,180 +1312,78 @@
       goUsername.value = localStorage.getItem('woprun_username') || '';
       goEmail.value = localStorage.getItem('woprun_email') || '';
       screenGO.classList.remove('hidden');
+      screenGO.classList.remove('show-in');
+      requestAnimationFrame(() => requestAnimationFrame(() => screenGO.classList.add('show-in')));
     }
 
-    // SUBMIT button
-    document.getElementById('btn-submit').addEventListener('click', async () => {
-      const u = goUsername.value.trim();
-      const e = goEmail.value.trim();
-      if (!u || !e) { goMsg.textContent = 'Fill in both fields'; return; }
-      localStorage.setItem('woprun_username', u);
-      localStorage.setItem('woprun_email', e);
-      goMsg.textContent = 'Submitting...';
-      try {
-        if (score === _gv()) {
-          // Score legit — invia davvero
-          await submitScore(u, e, score);
-        } else {
-          // Score manipolato — finge di inviare
-          await new Promise(r => setTimeout(r, 800));
-        }
-        goMsg.textContent = 'Score submitted!';
-        document.getElementById('btn-submit').style.display = 'none';
-      } catch (err) {
-        goMsg.textContent = 'Error, try again';
-      }
-    });
-
-    // PLAY AGAIN button
-    document.getElementById('btn-replay').addEventListener('click', () => {
-      screenGO.classList.add('hidden');
-      // Clear all pending game timers
+    function resetGame() {
+      _goShown = false;
       _timers.forEach(t => clearTimeout(t.id));
       _timers.length = 0;
-      // Reset game state
       score = 0; _rv(); lives = 1; beatCount = 0; isGameOver = false;
       isFalling = false; isInvincible = false; excActive = false;
-      lastBeat = null; isPaused = false;
+      lastBeat = null; isPaused = true;
       BPM = 120; BEAT_MS = 60000 / BPM;
       djUnlocked = false; goUnlocked = false;
       fallingElements.length = 0; nextSpawnIn = 4;
       runners.length = 0; blinkStep = 0; snowIndex = 0; djDropIndex = 0;
       selectedChar = 2;
-      // Turn off all layers, then restore bg
       layers.forEach(l => { l.opacity = INACTIVE_OPACITY; });
       bgMat.opacity = BG_OPACITY;
       amMat.opacity = isAM ? ACTIVE_OPACITY : INACTIVE_OPACITY;
       pmMat.opacity = isAM ? INACTIVE_OPACITY : ACTIVE_OPACITY;
-      // Reset UI
       updateScore(0);
       updateLivesDisplay();
       applyCharSelection();
       pauseMat.opacity = INACTIVE_OPACITY;
       playMat.opacity = INACTIVE_OPACITY;
-      // Reset fall mats
       fallMats.forEach(f => { f.char.opacity = f.shock.opacity = f.stars.opacity = INACTIVE_OPACITY; });
-      document.getElementById('btn-submit').style.display = '';
       goMsg.textContent = '';
+    }
+
+    // SALVA button — submit in background, train transition to leaderboard
+    document.getElementById('btn-avanti').addEventListener('click', () => {
+      const u = goUsername.value.trim();
+      const e = goEmail.value.trim();
+      if (!u || !e) { goMsg.textContent = 'Compila entrambi i campi'; return; }
+      localStorage.setItem('woprun_username', u);
+      localStorage.setItem('woprun_email', e);
+
+      // Submit in background (fire and forget)
+      if (score === _gv()) {
+        submitScore(u, e, score).catch(() => {});
+      }
+
+      // Prepare leaderboard (visible but positioned below, no transition yet)
+      resetGame();
+      fetchLeaderboard();
+      screenLB.classList.remove('hidden');
+      screenLB.classList.remove('show-in');
+      screenLB.classList.remove('exit-up');
+      // Force it below screen with no transition
+      screenLB.style.transition = 'none';
+      screenLB.querySelectorAll('.receipt, .btn').forEach(el => el.style.transition = 'none');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Restore transitions
+          screenLB.style.transition = '';
+          screenLB.querySelectorAll('.receipt, .btn').forEach(el => el.style.transition = '');
+
+          // Both move together: GO exits up, LB enters from below
+          screenGO.classList.add('exit-up');
+          screenLB.classList.add('show-in');
+
+          // Clean up GO after exit animation
+          setTimeout(() => {
+            screenGO.classList.remove('show-in', 'exit-up');
+            screenGO.classList.add('hidden');
+          }, 800);
+        });
+      });
     });
 
   </script>
 
-  <!-- ── THREE.JS: game canvas as texture on 3D screen ──── -->
-  <script type="importmap">
-  { "imports": { "three": "https://unpkg.com/three@0.163.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.163.0/examples/jsm/" } }
-  </script>
-  <script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-    if (!window.__THREE_D_MODE) throw 'skip';
-
-    const gameCanvas = document.getElementById('canvas');
-
-    // Create Three.js renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0xc8c8c3);
-    renderer.domElement.id = 'three-canvas';
-    document.body.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-
-    // Perspective camera for 3D orbit
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const camera = new THREE.PerspectiveCamera(45, vw / vh, 0.1, 1000);
-    camera.position.set(0, 0, vh * 1.1);
-    camera.lookAt(0, 0, 0);
-
-    // OrbitControls
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.target.set(0, 0, 0);
-
-    // Use game canvas directly as texture
-    const texture = new THREE.CanvasTexture(gameCanvas);
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-
-    // Plane sized to match the game rect
-    const _AR = 1241 / 1754;
-    const _PH = 5 / 3;
-    const topRatio = 235.59 / 1920;
-    const btnRatio = 0.16;
-
-    function getGameRect() {
-      const vw = window.innerWidth, vh = window.innerHeight;
-      const gapTop = 16, gapBot = 12, padBot = 24;
-      const maxH = (vh - gapTop - gapBot - padBot) / (1 + _AR * (topRatio + btnRatio));
-      const h = Math.min(vh * _PH / 2 - 10, maxH);
-      const w = h * _AR;
-      return { w, h };
-    }
-
-    const rect = getGameRect();
-    const planeGeo = new THREE.PlaneGeometry(rect.w, rect.h);
-
-    // The texture shows the full canvas; we need UV to show just the game rect
-    const screenMat = new THREE.MeshBasicMaterial({ map: texture });
-    const plane = new THREE.Mesh(planeGeo, screenMat);
-    scene.add(plane);
-
-    function updateUVs() {
-      const vw = window.innerWidth, vh = window.innerHeight;
-      const gapTop = 16, gapBot = 12, padBot = 24;
-      const maxH = (vh - gapTop - gapBot - padBot) / (1 + IMG_AR * (topRatio + btnRatio));
-      const h = Math.min(vh * PLANE_H / 2 - 10, maxH);
-      const w = h * IMG_AR;
-      const topH = w * topRatio;
-      const totalH = topH + gapTop + h + gapBot + w * btnRatio + padBot;
-      const startY = (vh - totalH) / 2;
-      const x = (vw - w) / 2;
-      const y = startY + topH + gapTop;
-
-      // Canvas buffer is DPR-scaled, but UV is 0-1 based on canvas.width/height
-      const cw = gameCanvas.width, ch = gameCanvas.height;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const u0 = (x * dpr) / cw;
-      const u1 = ((x + w) * dpr) / cw;
-      const v0 = 1 - ((y + h) * dpr) / ch; // flip Y (canvas Y is top-down, UV is bottom-up)
-      const v1 = 1 - (y * dpr) / ch;
-
-      const uv = plane.geometry.attributes.uv;
-      // PlaneGeometry UV layout: [0,1], [1,1], [0,0], [1,0]
-      uv.setXY(0, u0, v1);
-      uv.setXY(1, u1, v1);
-      uv.setXY(2, u0, v0);
-      uv.setXY(3, u1, v0);
-      uv.needsUpdate = true;
-
-      // Update plane size
-      const scale = w / rect.w;
-      plane.scale.set(scale, scale, 1);
-    }
-
-    // Lights
-    scene.add(new THREE.AmbientLight(0xffffff, 1));
-
-    function animate3D() {
-      requestAnimationFrame(animate3D);
-      texture.needsUpdate = true;
-      updateUVs();
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    requestAnimationFrame(animate3D);
-
-    window.addEventListener('resize', () => {
-      const vw = window.innerWidth, vh = window.innerHeight;
-      camera.aspect = vw / vh;
-      camera.position.z = vh * 1.1;
-      camera.updateProjectionMatrix();
-      renderer.setSize(vw, vh);
-    });
-  </script>
 
 </body>
 </html>
