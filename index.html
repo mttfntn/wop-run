@@ -5,8 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>WebGame</title>
   <style>
+    @font-face {
+      font-family: 'OverusedGrotesk';
+      src: url('OverusedGrotesk-Roman.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'MerchantCopy';
+      src: url('Merchant Copy.woff2') format('woff2');
+      font-weight: 400;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #c8c8c3; touch-action: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; touch-action: none; }
     canvas#canvas { display: block; position: fixed; top: 0; left: -9999px; filter: blur(0.15px) contrast(4); }
     canvas#three-canvas { display: block; position: fixed; top: 0; left: 0; z-index: 1; }
 
@@ -15,7 +25,7 @@
       position: fixed;
       z-index: 10;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
     }
     #bottom-bar button {
@@ -34,42 +44,46 @@
     }
     #bottom-bar button { touch-action: manipulation; }
     .arrow { pointer-events: none; }
-    #center-btns {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    .pill-wrap {
+    .btn-wrap {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
+      gap: 2px;
     }
-    #center-btns button {
-      width: auto !important;
-      height: auto !important;
-      background: none;
-      border: 2.5px solid #222;
-      border-radius: 999px;
-      cursor: pointer;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-      padding: 0;
-    }
-    .pill-wrap span {
-      font-family: sans-serif;
-      font-size: 0.7rem;
-      font-weight: 600;
+    .btn-label {
+      font-family: 'OverusedGrotesk', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 400;
       color: #222;
       text-transform: lowercase;
+      pointer-events: none;
     }
+    /* ── SPLASH SCREEN ──────────────────────────────── */
+    #splash {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #000; z-index: 9999;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      transition: transform 0.6s ease-in;
+    }
+    #splash.hide { transform: translateY(-100%); }
+    #splash-logo { width: 50%; max-width: 300px; filter: invert(1); }
+    #splash-pct {
+      margin-top: 20px;
+      font-family: 'OverusedGrotesk', sans-serif; font-size: 1rem; font-weight: 600;
+      color: #fff;
+    }
+
     /* ── OVERLAY SCREENS ─────────────────────────────── */
+    .overlay, .overlay input, .overlay button {
+      font-family: 'OverusedGrotesk', sans-serif;
+    }
     .overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       z-index: 50; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       background: rgba(200,200,195,0.96);
-      font-family: sans-serif; color: #222;
+      font-family: 'OverusedGrotesk', sans-serif; color: #222;
     }
     .overlay.hidden { display: none; }
     .overlay h1 { font-size: 1.6rem; margin-bottom: 12px; }
@@ -93,42 +107,181 @@
     .overlay .btn-outline { background: none; color: #222; }
     .overlay .score-big { font-size: 2.2rem; font-weight: 800; margin: 8px 0; }
     .overlay .loading { opacity: 0.5; font-size: 0.85rem; }
+
+    /* ── RECEIPT ─────────────────────────────────────── */
+    .receipt {
+      background: none;
+      color: #111;
+      font-family: 'MerchantCopy', 'Courier New', monospace;
+      position: relative;
+      width: 92%; max-width: 400px;
+      padding: 16px 22px 20px;
+      text-align: center;
+      transform: rotate(-2deg);
+      line-height: 1.0;
+      letter-spacing: 0;
+      overflow: hidden;
+      clip-path: url(#torn-edge);
+    }
+    .receipt::before {
+      content: ''; position: absolute; inset: 0; z-index: 0;
+      background: url('Texture.webp') center/cover;
+      filter: invert(1);
+    }
+    .receipt > * { position: relative; z-index: 1; }
+    .receipt img.receipt-logo { width: 55%; margin-bottom: 4px; filter: url(#thermal); }
+    .receipt pre {
+      font-family: inherit; font-size: inherit;
+      white-space: pre; text-align: left;
+      line-height: 0.8; margin: 0;
+      width: 100%;
+    }
+    #lb-text-top { margin-bottom: 0px; }
+    #lb-text-bot { margin-bottom: 0; }
+    .receipt .r-ascii-border { line-height: 0.8; margin: 0; padding: 0; }
+    .receipt .r-ascii { line-height: 0.8; margin: -5px 0; padding: 0; }
   </style>
 </head>
 <body>
+  <!-- SVG filter for thermal printer distortion + torn edge clip -->
+  <svg width="0" height="0" style="position:absolute">
+    <filter id="thermal">
+      <feTurbulence type="turbulence" baseFrequency="0.02 0.06" numOctaves="3" seed="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <clipPath id="torn-edge" clipPathUnits="objectBoundingBox">
+      <path d="
+        M 0 0.005
+        L 0.012 0.002 0.02 0.008 0.03 0.001 0.038 0.007
+        C 0.042 0.009, 0.046 0.001, 0.05 0.002
+        L 0.06 0.008 0.068 0.001 0.078 0.006 0.086 0.002 0.096 0.009
+        L 0.104 0.001 0.114 0.007 0.122 0.003 0.132 0.008
+        C 0.136 0.010, 0.14 0.001, 0.144 0.002
+        L 0.154 0.007 0.162 0.001 0.172 0.009 0.18 0.003 0.19 0.006
+        L 0.198 0.001 0.208 0.008 0.216 0.002 0.226 0.007 0.234 0.001
+        C 0.24 0.000, 0.244 0.009, 0.248 0.008
+        L 0.258 0.002 0.266 0.006 0.276 0.001 0.284 0.009 0.294 0.003
+        L 0.302 0.007 0.312 0.001 0.32 0.008 0.33 0.002
+        C 0.336 0.001, 0.34 0.008, 0.344 0.006
+        L 0.354 0.001 0.362 0.009 0.372 0.003 0.38 0.007 0.39 0.001
+        L 0.398 0.008 0.408 0.002 0.416 0.006 0.426 0.001
+        C 0.432 0.000, 0.436 0.009, 0.44 0.007
+        L 0.45 0.002 0.458 0.008 0.468 0.001 0.476 0.006 0.486 0.002
+        L 0.494 0.009 0.504 0.001 0.512 0.007 0.522 0.003
+        C 0.528 0.001, 0.532 0.010, 0.536 0.008
+        L 0.546 0.002 0.554 0.006 0.564 0.001 0.572 0.009 0.582 0.003
+        L 0.59 0.007 0.60 0.001 0.608 0.008 0.618 0.002
+        C 0.624 0.001, 0.628 0.009, 0.632 0.006
+        L 0.642 0.001 0.65 0.008 0.66 0.003 0.668 0.007 0.678 0.001
+        L 0.686 0.009 0.696 0.002 0.704 0.006 0.714 0.001
+        C 0.72 0.000, 0.724 0.008, 0.728 0.007
+        L 0.738 0.002 0.746 0.009 0.756 0.001 0.764 0.006 0.774 0.003
+        L 0.782 0.008 0.792 0.001 0.80 0.007 0.81 0.002
+        C 0.816 0.001, 0.82 0.009, 0.824 0.006
+        L 0.834 0.001 0.842 0.008 0.852 0.003 0.86 0.007 0.87 0.001
+        L 0.878 0.009 0.888 0.002 0.896 0.006 0.906 0.001
+        C 0.912 0.000, 0.916 0.008, 0.92 0.007
+        L 0.93 0.002 0.938 0.009 0.948 0.001 0.956 0.006 0.966 0.003
+        L 0.974 0.008 0.984 0.001 0.992 0.007 1.0 0.004
+        L 1.0 0.996
+        L 0.992 0.999 0.984 0.992 0.974 0.998 0.966 0.993
+        C 0.96 0.991, 0.956 0.999, 0.952 0.998
+        L 0.942 0.992 0.934 0.998 0.924 0.993 0.916 0.999 0.906 0.991
+        L 0.898 0.998 0.888 0.993 0.878 0.999
+        C 0.872 1.0, 0.868 0.991, 0.864 0.993
+        L 0.854 0.998 0.846 0.992 0.836 0.999 0.828 0.993 0.818 0.998
+        L 0.81 0.992 0.80 0.999 0.792 0.993 0.782 0.998
+        C 0.776 0.999, 0.772 0.991, 0.768 0.993
+        L 0.758 0.998 0.75 0.992 0.74 0.999 0.732 0.993 0.722 0.998
+        L 0.714 0.991 0.704 0.999 0.696 0.993 0.686 0.998
+        C 0.68 1.0, 0.676 0.991, 0.672 0.993
+        L 0.662 0.999 0.654 0.992 0.644 0.998 0.636 0.993 0.626 0.999
+        L 0.618 0.992 0.608 0.998 0.60 0.993 0.59 0.999
+        C 0.584 0.999, 0.58 0.991, 0.576 0.993
+        L 0.566 0.998 0.558 0.992 0.548 0.999 0.54 0.993 0.53 0.998
+        L 0.522 0.991 0.512 0.999 0.504 0.993 0.494 0.998
+        C 0.488 1.0, 0.484 0.991, 0.48 0.993
+        L 0.47 0.999 0.462 0.992 0.452 0.998 0.444 0.993 0.434 0.999
+        L 0.426 0.992 0.416 0.998 0.408 0.993 0.398 0.999
+        C 0.392 0.999, 0.388 0.991, 0.384 0.993
+        L 0.374 0.998 0.366 0.992 0.356 0.999 0.348 0.993 0.338 0.998
+        L 0.33 0.991 0.32 0.999 0.312 0.993 0.302 0.998
+        C 0.296 1.0, 0.292 0.991, 0.288 0.993
+        L 0.278 0.999 0.27 0.992 0.26 0.998 0.252 0.993 0.242 0.999
+        L 0.234 0.992 0.224 0.998 0.216 0.993 0.206 0.999
+        C 0.20 0.999, 0.196 0.991, 0.192 0.993
+        L 0.182 0.998 0.174 0.992 0.164 0.999 0.156 0.993 0.146 0.998
+        L 0.138 0.991 0.128 0.999 0.12 0.993 0.11 0.998
+        C 0.104 1.0, 0.10 0.991, 0.096 0.993
+        L 0.086 0.999 0.078 0.992 0.068 0.998 0.06 0.993 0.05 0.999
+        L 0.042 0.992 0.032 0.998 0.024 0.993 0.014 0.999 0 0.995
+        Z
+      "/>
+    </clipPath>
+  </svg>
+
   <!-- LEADERBOARD SCREEN (shown before game) -->
   <div id="screen-leaderboard" class="overlay">
-    <h1>LEADERBOARD</h1>
-    <table>
-      <thead><tr><th>#</th><th>Player</th><th>Score</th></tr></thead>
-      <tbody id="lb-body"><tr><td colspan="3" class="loading">Loading...</td></tr></tbody>
-    </table>
-    <button class="btn" id="btn-play">PLAY</button>
+    <div class="receipt">
+      <img src="svg/logos.svg" class="receipt-logo">
+      <pre id="lb-text-top"></pre>
+      <pre class="r-ascii-border">-----------------------------------------
+*****************************************</pre>
+      <pre id="lb-ascii" class="r-ascii"> _       ______  ____  ____  __  ___   __
+| |     / / __ \/ __ \/ __ \/ / / / | / /
+| | /| / / / / / /_/ / /_/ / / / /  |/ /
+| |/ |/ / /_/ / ____/ _, _/ /_/ / /|  /
+|__/|__/\____/_/   /_/ |_|\____/_/ |_/
+*****************************************
+-----------------------------------------</pre>
+      <pre id="lb-text-bot"></pre>
+    </div>
+    <button class="btn" id="btn-play" style="margin-top:16px">PLAY</button>
   </div>
 
   <!-- GAME OVER SCREEN (shown after game ends) -->
   <div id="screen-gameover" class="overlay hidden">
-    <h1>GAME OVER</h1>
-    <div class="score-big" id="go-score">0</div>
-    <h2>Submit your score</h2>
-    <input id="go-username" type="text" placeholder="Username" maxlength="20" autocomplete="off">
-    <input id="go-email" type="email" placeholder="Email" autocomplete="off">
-    <button class="btn" id="btn-submit">SUBMIT</button>
-    <div id="go-msg" style="margin-top:10px;font-size:0.85rem"></div>
-    <button class="btn btn-outline" id="btn-replay" style="margin-top:8px">PLAY AGAIN</button>
+    <div class="receipt receipt-go">
+      <img src="svg/logos.svg" class="receipt-logo">
+      <pre id="go-receipt-text"></pre>
+      <div style="margin:10px 0 6px;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;z-index:1;">
+        <input id="go-username" type="text" placeholder="USERNAME" maxlength="20" autocomplete="off" style="font-family:'MerchantCopy',monospace;text-transform:uppercase;width:80%;padding:6px 8px;border:2px solid #222;background:transparent;font-size:inherit;text-align:center">
+        <input id="go-email" type="email" placeholder="EMAIL" autocomplete="off" style="font-family:'MerchantCopy',monospace;width:80%;padding:6px 8px;border:2px solid #222;background:transparent;font-size:inherit;text-align:center">
+        <div id="go-msg" style="font-size:0.85em"></div>
+      </div>
+      <pre id="go-receipt-bot"></pre>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:12px;position:relative;z-index:1">
+      <button class="btn" id="btn-submit">SUBMIT</button>
+      <button class="btn btn-outline" id="btn-replay">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- SPLASH SCREEN -->
+  <div id="splash">
+    <img src="svg/logos.svg" id="splash-logo">
+    <div id="splash-pct">0%</div>
   </div>
 
   <canvas id="canvas"></canvas>
   <img id="top-bar" src="svg/top.svg" style="position:fixed;pointer-events:none;z-index:10;object-fit:fill">
   <div id="bottom-bar">
-    <svg class="arrow arrow-left" viewBox="0 0 40 60"><polygon points="40,0 0,30 40,60" fill="#222"/></svg>
-    <button id="chr-prev"><img src="svg/button.svg" style="width:100%;height:100%;pointer-events:none"></button>
-    <div id="center-btns">
-      <div class="pill-wrap"><button id="sound-btn"></button><span>sound</span></div>
-      <div class="pill-wrap"><button id="pause-btn"></button><span>play/pause</span></div>
+    <div class="btn-wrap">
+      <button id="chr-prev"><img src="svg/button.svg" style="width:100%;height:100%;pointer-events:none"></button>
+      <svg class="arrow arrow-left" viewBox="0 0 40 60"><polygon points="40,0 0,30 40,60" fill="#222"/></svg>
     </div>
-    <button id="chr-next"><img src="svg/button.svg" style="width:100%;height:100%;pointer-events:none"></button>
-    <svg class="arrow arrow-right" viewBox="0 0 40 60"><polygon points="0,0 40,30 0,60" fill="#222"/></svg>
+    <div class="btn-wrap">
+      <button id="sound-btn"><img src="svg/button.svg" style="width:100%;height:100%;pointer-events:none"></button>
+      <span class="btn-label">sound</span>
+    </div>
+    <div class="btn-wrap">
+      <button id="pause-btn"><img src="svg/button.svg" style="width:100%;height:100%;pointer-events:none"></button>
+      <span class="btn-label">play/pause</span>
+    </div>
+    <div class="btn-wrap">
+      <button id="chr-next"><img src="svg/button.svg" style="width:100%;height:100%;pointer-events:none"></button>
+      <svg class="arrow arrow-right" viewBox="0 0 40 60"><polygon points="0,0 40,30 0,60" fill="#222"/></svg>
+    </div>
   </div>
 
   <script>
@@ -145,6 +298,9 @@
 
     const MOBILE_ONLY      = false;
     const THREE_D_MODE     = false;
+    const SHOW_SPLASH      = true;
+    const BG_COLOR         = '#cec8c0';
+    document.body.style.background = BG_COLOR;
     const ACTIVE_OPACITY   = 1.0;
     const INACTIVE_OPACITY = 0;
     let BPM                = 120;
@@ -155,6 +311,38 @@
     const SPAWN_CHANCE     = 5.95; // probability of spawning when timer hits
     const BOTTLE_CHANCE    = 0.1; // probability of bottle vs bun
     // ═══════════════════════════════════════════════════════
+
+    // ── PAUSE-AWARE TIMERS ──────────────────────────────
+    const _timers = [];
+    function gameTimeout(fn, ms) {
+      const t = { fn, start: performance.now(), delay: ms, remaining: ms, id: null };
+      t.id = setTimeout(() => {
+        const idx = _timers.indexOf(t);
+        if (idx >= 0) _timers.splice(idx, 1);
+        fn();
+      }, ms);
+      _timers.push(t);
+      return t;
+    }
+    function pauseTimers() {
+      const now = performance.now();
+      for (const t of _timers) {
+        clearTimeout(t.id);
+        t.remaining = Math.max(0, t.delay - (now - t.start));
+      }
+    }
+    function resumeTimers() {
+      const now = performance.now();
+      for (const t of _timers) {
+        t.start = now;
+        t.delay = t.remaining;
+        t.id = setTimeout(() => {
+          const idx = _timers.indexOf(t);
+          if (idx >= 0) _timers.splice(idx, 1);
+          t.fn();
+        }, t.remaining);
+      }
+    }
 
     let BEAT_MS = 60000 / BPM;
     const IMG_W   = 1241;
@@ -189,10 +377,10 @@
       const vh = window.innerHeight;
       const vw = window.innerWidth;
       const topRatio = 235.59 / 1920; // top bar height relative to width
-      const btnRatio = 0.20;          // button size relative to width
+      const btnRatio = 0.16;          // button size relative to width
       const gapTop = 16;              // spacing between top bar and game
       const gapBot = 12;              // spacing between game and buttons
-      const padBot = 24;              // padding below buttons
+      const padBot = 44;              // padding below buttons (includes label + margin)
       // h + w*topRatio + w*btnRatio + gapTop + gapBot + padBot <= vh
       const maxH = (vh - gapTop - gapBot - padBot) / (1 + IMG_AR * (topRatio + btnRatio));
       const h = Math.min(vh * PLANE_H / 2 - 10, maxH);
@@ -207,16 +395,55 @@
       return { x, y, w, h };
     }
 
-    // ── LAYER SYSTEM (replaces Three.js meshes) ───────────
-    // Each layer: { img: HTMLImageElement, opacity: number }
-    // Drawn back-to-front in insertion order.
+    // ── LOADING TRACKER ────────────────────────────────────
+    let _loadTotal = 0, _loadDone = 0;
+    let _lbLoaded = false;
+    const splashEl  = document.getElementById('splash');
+    const splashPct = document.getElementById('splash-pct');
+
+    let _splashCounting = false;
+
+    function updateSplash() {
+      if (!SHOW_SPLASH) { splashEl.style.display = 'none'; return; }
+      const total = _loadTotal + 1;
+      const done  = _loadDone + (_lbLoaded ? 1 : 0);
+
+      if (done >= total && !_splashCounting) {
+        _splashCounting = true;
+        let i = 0;
+        function tick() {
+          splashPct.textContent = i + '%';
+          if (i >= 100) {
+            setTimeout(() => {
+              splashEl.classList.add('hide');
+              setTimeout(() => { splashEl.style.display = 'none'; }, 700);
+            }, 300);
+            return;
+          }
+          i++;
+          setTimeout(tick, 5);
+        }
+        tick();
+      }
+    }
+    if (!SHOW_SPLASH) splashEl.style.display = 'none';
+
+    // ── LAYER SYSTEM ────────────────────────────────────────
     const layers = [];
 
     function makeMesh(src, _z, opacity) {
-      const mat = { img: null, opacity }; // mat.opacity is what all game logic modifies
+      _loadTotal++;
+      const mat = { img: null, opacity };
       layers.push(mat);
       const el = new Image();
-      el.onload = () => createImageBitmap(el).then(bmp => { mat.img = bmp; });
+      el.onload = () => {
+        if (typeof createImageBitmap === 'function') {
+          createImageBitmap(el).then(bmp => { mat.img = bmp; _loadDone++; updateSplash(); });
+        } else {
+          mat.img = el; _loadDone++; updateSplash();
+        }
+      };
+      el.onerror = () => { _loadDone++; updateSplash(); };
       el.src = src;
       return { mat };
     }
@@ -224,7 +451,7 @@
     // ── LAYERS ────────────────────────────────────────────
 
     // BG base
-    makeMesh('Blocks/bg.webp', 0, BG_OPACITY);
+    const bgMat = makeMesh('Blocks/bg.webp', 0, BG_OPACITY).mat;
 
     // BG
     const fireestMat = makeMesh('Blocks/BG/fireest.webp', 0, INACTIVE_OPACITY).mat;
@@ -296,12 +523,12 @@
       const keys = BONUS_LAYERS[type];
       Object.values(bonus).forEach(m => { m.opacity = INACTIVE_OPACITY; });
       keys.forEach(k => { bonus[k].opacity = ACTIVE_OPACITY; });
-      setTimeout(() => { keys.forEach(k => { bonus[k].opacity = INACTIVE_OPACITY; }); }, BEAT_MS * 2);
+      gameTimeout(() => { keys.forEach(k => { bonus[k].opacity = INACTIVE_OPACITY; }); }, BEAT_MS * 2);
     }
 
     const isAM = new Date().getHours() < 12;
-    makeMesh('Blocks/UI/am.webp', 0, isAM ? ACTIVE_OPACITY : INACTIVE_OPACITY);
-    makeMesh('Blocks/UI/pm.webp', 0, isAM ? INACTIVE_OPACITY : ACTIVE_OPACITY);
+    const amMat = makeMesh('Blocks/UI/am.webp', 0, isAM ? ACTIVE_OPACITY : INACTIVE_OPACITY).mat;
+    const pmMat = makeMesh('Blocks/UI/pm.webp', 0, isAM ? INACTIVE_OPACITY : ACTIVE_OPACITY).mat;
 
     const toneMat  = makeMesh('Blocks/UI/tone.webp', 0, INACTIVE_OPACITY).mat;
     const life1Mat = makeMesh('Blocks/UI/lives/life1.webp', 0, INACTIVE_OPACITY).mat;
@@ -315,9 +542,9 @@
     function blinkMiss() {
       const half = BEAT_MS / 2;
       missMat.opacity = ACTIVE_OPACITY;
-      setTimeout(() => { missMat.opacity = INACTIVE_OPACITY; }, half);
-      setTimeout(() => { missMat.opacity = ACTIVE_OPACITY;   }, half * 2);
-      setTimeout(() => { missMat.opacity = INACTIVE_OPACITY; }, half * 3);
+      gameTimeout(() => { missMat.opacity = INACTIVE_OPACITY; }, half);
+      gameTimeout(() => { missMat.opacity = ACTIVE_OPACITY;   }, half * 2);
+      gameTimeout(() => { missMat.opacity = INACTIVE_OPACITY; }, half * 3);
     }
 
     // GO
@@ -397,6 +624,7 @@
       stars: makeMesh(`Blocks/Fall/Char${n}/fallstars${n}.webp`, 0, INACTIVE_OPACITY).mat,
     }));
     let isFalling = false;
+    let isInvincible = false;
     let isGameOver = false;
     let gameOverTierMats = [];
     let boltsTimer = null;
@@ -407,8 +635,8 @@
       chrMats.forEach(c => { c.bolts.opacity = INACTIVE_OPACITY; });
       chrMats[selectedChar].bolts.opacity = ACTIVE_OPACITY;
       boltsEndTime = performance.now() + duration;
-      boltsTimer = setTimeout(() => {
-        chrMats[selectedChar].bolts.opacity = INACTIVE_OPACITY;
+      boltsTimer = gameTimeout(() => {
+        chrMats.forEach(c => { c.bolts.opacity = INACTIVE_OPACITY; });
         boltsTimer = null;
       }, duration);
     }
@@ -421,8 +649,8 @@
       chrMats.forEach(c => { c.tears.opacity = INACTIVE_OPACITY; });
       chrMats[selectedChar].tears.opacity = ACTIVE_OPACITY;
       tearsEndTime = performance.now() + duration;
-      tearsTimer = setTimeout(() => {
-        chrMats[selectedChar].tears.opacity = INACTIVE_OPACITY;
+      tearsTimer = gameTimeout(() => {
+        chrMats.forEach(c => { c.tears.opacity = INACTIVE_OPACITY; });
         tearsTimer = null;
       }, duration);
     }
@@ -447,13 +675,13 @@
       f.shock.opacity = ACTIVE_OPACITY;
       f.char.opacity  = ACTIVE_OPACITY;
       f.stars.opacity = ACTIVE_OPACITY;
-      setTimeout(() => { f.shock.opacity = INACTIVE_OPACITY; }, half);
+      gameTimeout(() => { f.shock.opacity = INACTIVE_OPACITY; }, half);
 
       // After 1 beat: fallchar + stars off, either game over or blink phase
-      setTimeout(() => {
+      gameTimeout(() => {
         if (lives === 0) {
           isGameOver = true;
-          setTimeout(showGameOver, 2000); // show form after 2s
+          gameTimeout(showGameOver, 2000); // show form after 2s
           gameOverTierMats = [];
           for (let t = 1; t <= 8; t++) {
             tierSets[t].forEach(s => {
@@ -470,11 +698,21 @@
         f.char.opacity  = INACTIVE_OPACITY;
         f.stars.opacity = INACTIVE_OPACITY;
         showBolts(BEAT_MS);
-        setTimeout(() => { c.shared.opacity = c.walk1.opacity = ACTIVE_OPACITY;   }, 0);
-        setTimeout(() => { c.shared.opacity = c.walk1.opacity = INACTIVE_OPACITY; }, half);
-        setTimeout(() => { c.shared.opacity = c.walk1.opacity = ACTIVE_OPACITY;   }, half * 2);
-        setTimeout(() => { c.shared.opacity = c.walk1.opacity = INACTIVE_OPACITY; }, half * 3);
-        setTimeout(() => { c.shared.opacity = c.walk1.opacity = ACTIVE_OPACITY; isFalling = false; }, half * 4);
+        isFalling = false;    // allow movement during blink
+        isInvincible = true;  // but can't be hit
+        function blinkCur(op) {
+          const ch = chrMats[selectedChar];
+          ch.shared.opacity = op;
+          // Blink whichever walk frame the beat cycle has active
+          const walkA = beatCount % 2 === 0;
+          ch.walk1.opacity = (walkA ? op : INACTIVE_OPACITY);
+          ch.walk2.opacity = (walkA ? INACTIVE_OPACITY : op);
+        }
+        gameTimeout(() => blinkCur(ACTIVE_OPACITY),   0);
+        gameTimeout(() => blinkCur(INACTIVE_OPACITY), half);
+        gameTimeout(() => blinkCur(ACTIVE_OPACITY),   half * 2);
+        gameTimeout(() => blinkCur(INACTIVE_OPACITY), half * 3);
+        gameTimeout(() => { blinkCur(ACTIVE_OPACITY); isInvincible = false; }, half * 4);
       }, BEAT_MS);
     }
 
@@ -511,9 +749,9 @@
       const allSegs = digitMats.flatMap(d => Object.values(d));
       const snapshot = allSegs.map(m => m.opacity);
       allSegs.forEach(m => { m.opacity = INACTIVE_OPACITY; });
-      setTimeout(() => { allSegs.forEach((m, i) => { m.opacity = snapshot[i]; }); }, half);
-      setTimeout(() => { allSegs.forEach(m => { m.opacity = INACTIVE_OPACITY; }); }, half * 2);
-      setTimeout(() => { allSegs.forEach((m, i) => { m.opacity = snapshot[i]; }); }, half * 3);
+      gameTimeout(() => { allSegs.forEach((m, i) => { m.opacity = snapshot[i]; }); }, half);
+      gameTimeout(() => { allSegs.forEach(m => { m.opacity = INACTIVE_OPACITY; }); }, half * 2);
+      gameTimeout(() => { allSegs.forEach((m, i) => { m.opacity = snapshot[i]; }); }, half * 3);
     }
 
     function updateScore(delta) {
@@ -584,7 +822,7 @@
         // T7→T8: set stays same (both have 5 sets)
 
         if (el.tier > 8) {
-          if (!isGameOver && el.set === selectedChar) {
+          if (!isGameOver && !isInvincible && el.set === selectedChar) {
             if (el.type === 'bottle') {
               if (lives < 3) {
                 lives++;
@@ -595,10 +833,10 @@
               }
               wopMat.opacity = ACTIVE_OPACITY;
               showBolts(BEAT_MS);
-              setTimeout(() => {
+              gameTimeout(() => {
                 wopMat.opacity    = INACTIVE_OPACITY;
                 lightsMat.opacity = ACTIVE_OPACITY;
-                setTimeout(() => { lightsMat.opacity = INACTIVE_OPACITY; }, BEAT_MS * 1.5);
+                gameTimeout(() => { lightsMat.opacity = INACTIVE_OPACITY; }, BEAT_MS * 1.5);
               }, BEAT_MS);
             }
             if (el.type === 'bun' && lives > 0) { lives--; updateLivesDisplay(); updateScore(-100); showBonus('minus100'); setExc(false); triggerFall(); blinkMiss(); }
@@ -608,11 +846,15 @@
         }
       }
 
-      // Trigger exc when a bun is at tier 7 in the same lane (skip during fall/game over)
-      if (!isFalling && !isGameOver) {
-        for (const el of fallingElements) {
-          if (el.tier === 7 && el.type === 'bun' && el.set === selectedChar) setExc(true);
-        }
+      // Exc: on when a bun is at tier 7 or 8 in the same lane, off otherwise
+      if (!isFalling && !isInvincible && !isGameOver) {
+        const bunAhead = fallingElements.some(el =>
+          el.type === 'bun' && (el.tier === 7 || el.tier === 8) && el.set === selectedChar
+        );
+        if (bunAhead && !excActive) setExc(true);
+        else if (!bunAhead && excActive) setExc(false);
+      } else if (excActive) {
+        setExc(false);
       }
 
       // Render active elements
@@ -639,7 +881,7 @@
     }
 
     // ── CHARACTER SELECTION ───────────────────────────────
-    let selectedChar = 0;
+    let selectedChar = 2;
 
     function applyCharSelection() {
       chrMats.forEach((c, i) => {
@@ -684,23 +926,36 @@
     }
     tapButton(document.getElementById('chr-prev'), () => tryMoveChar(-1));
     tapButton(document.getElementById('chr-next'), () => tryMoveChar(1));
+    tapButton(document.getElementById('sound-btn'), () => { /* sound toggle – TODO */ });
 
     // ── PAUSE STATE ───────────────────────────────────────
     let isPaused = false;
 
-    document.getElementById('pause-btn').addEventListener('click', () => {
+    let pauseBlinkTimers = [];
+    let pauseLocked = false;
+
+    tapButton(document.getElementById('pause-btn'), () => {
+      if (pauseLocked) return;
       isPaused = !isPaused;
       pauseMat.opacity = isPaused ? INACTIVE_OPACITY : ACTIVE_OPACITY;
       playMat.opacity  = isPaused ? ACTIVE_OPACITY   : INACTIVE_OPACITY;
 
+      // Clear any ongoing pause blink
+      pauseBlinkTimers.forEach(id => clearTimeout(id));
+      pauseBlinkTimers = [];
+
       if (isPaused) {
+        pauseTimers();
+        pauseLocked = true;
         const active = layers.filter(l => l.opacity === ACTIVE_OPACITY);
         active.forEach(l => l.opacity = INACTIVE_OPACITY);
         const half = BEAT_MS / 2;
-        setTimeout(() => active.forEach(l => l.opacity = ACTIVE_OPACITY),     half);
-        setTimeout(() => active.forEach(l => l.opacity = INACTIVE_OPACITY), half * 2);
-        setTimeout(() => active.forEach(l => l.opacity = ACTIVE_OPACITY),   half * 3);
+        pauseBlinkTimers.push(setTimeout(() => active.forEach(l => l.opacity = ACTIVE_OPACITY),     half));
+        pauseBlinkTimers.push(setTimeout(() => active.forEach(l => l.opacity = INACTIVE_OPACITY), half * 2));
+        pauseBlinkTimers.push(setTimeout(() => { active.forEach(l => l.opacity = ACTIVE_OPACITY); pauseLocked = false; }, half * 3));
       } else {
+        // Cancel blink, restore all active layers immediately
+        resumeTimers();
         lastBeat = null;
       }
     });
@@ -825,30 +1080,26 @@
 
       // Position bottom buttons below game rect
       const bottomBar = document.getElementById('bottom-bar');
-      const btnSize = w * 0.20;
+      const btnSize = w * 0.16;
       const arrowH = btnSize * 0.333;
       const arrowW = arrowH * (40 / 60);
-      // Size circle buttons only (not center pill buttons)
-      bottomBar.querySelectorAll('#chr-prev, #chr-next').forEach(b => {
+      // Size all circle buttons
+      bottomBar.querySelectorAll('button').forEach(b => {
         b.style.width = btnSize + 'px'; b.style.height = btnSize + 'px';
       });
       // Size arrows
       bottomBar.querySelectorAll('.arrow').forEach(a => {
         a.style.width = arrowW + 'px'; a.style.height = arrowH + 'px';
       });
-      // Size center pill buttons
-      const pillFontSize = Math.max(w * 0.028, 8);
-      const pillPad = pillFontSize * 0.8;
-      bottomBar.querySelectorAll('#center-btns button').forEach(b => {
-        b.style.padding = pillPad + 'px ' + (pillPad * 4) + 'px';
-        b.style.borderWidth = Math.max(w * 0.012, 3) + 'px';
+      // Size labels
+      const lblSize = Math.max(w * 0.025, 7);
+      bottomBar.querySelectorAll('.btn-label').forEach(s => {
+        s.style.fontSize = lblSize + 'px';
       });
-      bottomBar.querySelectorAll('.pill-wrap span').forEach(s => {
-        s.style.fontSize = pillFontSize + 'px';
-      });
-      bottomBar.style.left  = x + 'px';
-      bottomBar.style.width = w + 'px';
-      bottomBar.style.top   = (y + h + 12) + 'px';
+      bottomBar.style.left    = (x + 10) + 'px';
+      bottomBar.style.width   = (w - 20) + 'px';
+      bottomBar.style.top     = (y + h + 12) + 'px';
+      bottomBar.style.paddingBottom = '16px';
 
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
@@ -887,19 +1138,95 @@
     // Start paused, show leaderboard
     isPaused = true;
 
+    const lbText = document.getElementById('lb-text');
+
+    function center(str, w) { const pad = Math.max(0, w - str.length); const l = Math.floor(pad / 2); return ' '.repeat(l) + str + ' '.repeat(pad - l); }
+    function line(w) { return '-'.repeat(w); }
+
     async function fetchLeaderboard() {
+      const W = 41; // receipt grid width (matches ASCII art)
+      const now = new Date();
+      const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+      let t = '';
+      t += center('WOP X MTTFNTN', W) + '\n';
+      t += center('TOP 10 PUNTEGGI', W) + '\n';
+      t += center('AGGIORNATO: OGGI, ' + time, W) + '\n';
+      t += line(W) + '\n';
+
       try {
         const res = await fetch(APPS_SCRIPT_URL);
         const data = await res.json();
-        if (!data.leaderboard || data.leaderboard.length === 0) {
-          lbBody.innerHTML = '<tr><td colspan="3">No scores yet</td></tr>';
-          return;
+        const lb = (data.leaderboard || []).slice(0, 10);
+
+        for (let i = 0; i < 10; i++) {
+          const num = String(i + 1).padStart(2) + '.';
+          const name = lb[i] ? lb[i].username.toUpperCase() : '';
+          const sc = lb[i] ? String(lb[i].score) : '';
+          const used = num.length + 1 + name.length + sc.length;
+          const dots = Math.max(1, W - used);
+          t += num + ' ' + name + '.'.repeat(dots) + sc + '\n';
         }
-        lbBody.innerHTML = data.leaderboard.map((r, i) =>
-          `<tr><td>${i + 1}</td><td>${r.username}</td><td>${r.score}</td></tr>`
-        ).join('');
+
+        t += line(W) + '\n';
+
+        const savedUser = localStorage.getItem('woprun_username');
+        if (savedUser) {
+          const personal = lb.find(r => r.username === savedUser);
+          if (personal) {
+            const rank = lb.findIndex(r => r.username === savedUser) + 1;
+            t += center("IL TUO PUNTEGGIO PIU' ALTO:", W) + '\n';
+            t += center(savedUser.toUpperCase() + ': ' + personal.score, W) + '\n';
+            if (rank === 1) {
+              t += center('SEI IL MIGLIORE...', W) + '\n';
+              t += center('MA SOLO AL MOMENTO.', W) + '\n';
+            } else if (rank === 2) {
+              t += center("IL PRIMO E' DIETRO", W) + '\n';
+              t += center("L'ANGOLO!", W) + '\n';
+            } else if (rank >= 3 && rank <= 10) {
+              t += center('SEI QUASI IN CIMA,', W) + '\n';
+              t += center('GIOCA ANCORA!', W) + '\n';
+            } else {
+              t += center('PUOI ANCORA MIGLIORARE,', W) + '\n';
+              t += center('GIOCA ANCORA!', W) + '\n';
+            }
+          } else {
+            t += center('GIOCA PER ENTRARE', W) + '\n';
+            t += center('IN CLASSIFICA!', W) + '\n';
+          }
+        } else {
+          t += center('GIOCA PER ENTRARE', W) + '\n';
+          t += center('IN CLASSIFICA!', W) + '\n';
+        }
+
+        t += '{{ASCII}}';
+        t += center('WOP RUN - WOP X MTTFNTN', W) + '\n';
+        t += center('2026', W);
       } catch (e) {
-        lbBody.innerHTML = '<tr><td colspan="3">Could not load</td></tr>';
+        t += center('COULD NOT LOAD', W) + '\n';
+      } finally {
+        const [top, bot] = t.split('{{ASCII}}');
+        document.getElementById('lb-text-top').textContent = top.trimEnd();
+        document.getElementById('lb-text-bot').textContent = bot.replace(/^\n+/, '').replace(/\s+$/, '');
+        // Size font so W chars exactly fill the receipt width
+        requestAnimationFrame(() => {
+          const receipt = document.querySelector('.receipt');
+          if (receipt) {
+            const rw = receipt.clientWidth - 44;
+            const m = document.createElement('span');
+            m.style.cssText = 'font-family:MerchantCopy,monospace;font-size:100px;position:absolute;left:-9999px;white-space:pre';
+            m.textContent = 'X'.repeat(W);
+            document.body.appendChild(m);
+            const chRatio = m.offsetWidth / (100 * W);
+            document.body.removeChild(m);
+            const fs = (rw / (W * chRatio)) + 'px';
+            document.getElementById('lb-text-top').style.fontSize = fs;
+            document.getElementById('lb-text-bot').style.fontSize = fs;
+            document.getElementById('lb-ascii').style.fontSize = fs;
+            document.querySelectorAll('.r-ascii-border').forEach(el => el.style.fontSize = fs);
+          }
+        });
+        _lbLoaded = true;
+        updateSplash();
       }
     }
 
@@ -925,10 +1252,46 @@
 
     // Show game over screen (called from game over logic)
     function showGameOver() {
-      goScore.textContent = score;
+      const W = 32;
+      function ctr(s) { const p = Math.max(0, W - s.length); const l = Math.floor(p/2); return ' '.repeat(l) + s + ' '.repeat(p-l); }
+      function ln() { return '-'.repeat(W); }
+      let t = '';
+      t += ctr('GAME OVER') + '\n';
+      t += ln() + '\n';
+      t += ctr('IL TUO PUNTEGGIO:') + '\n';
+      t += ctr(String(score)) + '\n';
+      t += ln() + '\n';
+      t += ctr('INSERISCI I DATI') + '\n';
+      t += ctr('PER SALVARE IL PUNTEGGIO') + '\n';
+      document.getElementById('go-receipt-text').textContent = t.trimEnd();
+
+      let b = '';
+      b += ln() + '\n';
+      b += ctr('WOP RUN - WOP X MTTFNTN') + '\n';
+      b += ctr('2026');
+      document.getElementById('go-receipt-bot').textContent = b;
+
+      // Size font
+      requestAnimationFrame(() => {
+        const rc = document.querySelector('.receipt-go');
+        if (rc) {
+          const rw = rc.clientWidth - 44;
+          const m = document.createElement('span');
+          m.style.cssText = 'font-family:MerchantCopy,monospace;font-size:100px;position:absolute;left:-9999px;white-space:pre';
+          m.textContent = 'X'.repeat(W);
+          document.body.appendChild(m);
+          const chRatio = m.offsetWidth / (100 * W);
+          document.body.removeChild(m);
+          const fs = (rw / (W * chRatio)) + 'px';
+          document.getElementById('go-receipt-text').style.fontSize = fs;
+          document.getElementById('go-receipt-bot').style.fontSize = fs;
+          rc.querySelectorAll('input').forEach(el => el.style.fontSize = fs);
+        }
+      });
+
       goMsg.textContent = '';
-      goUsername.value = '';
-      goEmail.value = '';
+      goUsername.value = localStorage.getItem('woprun_username') || '';
+      goEmail.value = localStorage.getItem('woprun_email') || '';
       screenGO.classList.remove('hidden');
     }
 
@@ -937,6 +1300,8 @@
       const u = goUsername.value.trim();
       const e = goEmail.value.trim();
       if (!u || !e) { goMsg.textContent = 'Fill in both fields'; return; }
+      localStorage.setItem('woprun_username', u);
+      localStorage.setItem('woprun_email', e);
       goMsg.textContent = 'Submitting...';
       try {
         if (score === _gv()) {
@@ -956,14 +1321,33 @@
     // PLAY AGAIN button
     document.getElementById('btn-replay').addEventListener('click', () => {
       screenGO.classList.add('hidden');
+      // Clear all pending game timers
+      _timers.forEach(t => clearTimeout(t.id));
+      _timers.length = 0;
       // Reset game state
-      score = 0; _rv(); lives = 1; beatCount = 0; isGameOver = false; isFalling = false;
+      score = 0; _rv(); lives = 1; beatCount = 0; isGameOver = false;
+      isFalling = false; isInvincible = false; excActive = false;
       lastBeat = null; isPaused = false;
       BPM = 120; BEAT_MS = 60000 / BPM;
+      djUnlocked = false; goUnlocked = false;
+      fallingElements.length = 0; nextSpawnIn = 4;
+      runners.length = 0; blinkStep = 0; snowIndex = 0; djDropIndex = 0;
+      selectedChar = 2;
+      // Turn off all layers, then restore bg
+      layers.forEach(l => { l.opacity = INACTIVE_OPACITY; });
+      bgMat.opacity = BG_OPACITY;
+      amMat.opacity = isAM ? ACTIVE_OPACITY : INACTIVE_OPACITY;
+      pmMat.opacity = isAM ? INACTIVE_OPACITY : ACTIVE_OPACITY;
+      // Reset UI
       updateScore(0);
       updateLivesDisplay();
+      applyCharSelection();
+      pauseMat.opacity = INACTIVE_OPACITY;
+      playMat.opacity = INACTIVE_OPACITY;
+      // Reset fall mats
+      fallMats.forEach(f => { f.char.opacity = f.shock.opacity = f.stars.opacity = INACTIVE_OPACITY; });
       document.getElementById('btn-submit').style.display = '';
-      fetchLeaderboard();
+      goMsg.textContent = '';
     });
 
   </script>
@@ -1011,7 +1395,7 @@
     const _AR = 1241 / 1754;
     const _PH = 5 / 3;
     const topRatio = 235.59 / 1920;
-    const btnRatio = 0.20;
+    const btnRatio = 0.16;
 
     function getGameRect() {
       const vw = window.innerWidth, vh = window.innerHeight;
