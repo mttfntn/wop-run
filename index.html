@@ -92,20 +92,20 @@
       background: transparent;
       font-family: 'OverusedGrotesk', sans-serif; color: #222;
     }
-    .overlay .receipt, .overlay .btn {
+    .overlay .receipt, .overlay .btn, .overlay .receipt-btn {
       transform: translateY(100vh) rotate(-2deg);
       opacity: 1;
       transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    .overlay.show-in .receipt, .overlay.show-in .btn {
+    .overlay.show-in .receipt, .overlay.show-in .btn, .overlay.show-in .receipt-btn {
       transform: translateY(0) rotate(-2deg);
       opacity: 1;
     }
-    .overlay.show-in .btn {
+    .overlay.show-in .btn, .overlay.show-in .receipt-btn {
       transition-delay: 0.15s;
     }
-    .overlay.show-in.exit-up .receipt, .overlay.show-in.exit-up .btn,
-    .overlay.exit-up .receipt, .overlay.exit-up .btn {
+    .overlay.show-in.exit-up .receipt, .overlay.show-in.exit-up .btn, .overlay.show-in.exit-up .receipt-btn,
+    .overlay.exit-up .receipt, .overlay.exit-up .btn, .overlay.exit-up .receipt-btn {
       transform: translateY(-120vh) rotate(-2deg);
     }
     .overlay.hidden { display: none; }
@@ -127,6 +127,14 @@
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
     }
     .overlay .btn:active { transform: scale(0.95); opacity: 0.8; }
+    .receipt-btn {
+      font-family: 'OverusedGrotesk', sans-serif; font-size: 2.2em;
+      cursor: pointer; text-align: center; color: #000;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .receipt-btn:hover { opacity: 0.5 !important; }
+    .receipt-btn:active { opacity: 0.3 !important; }
     .overlay .btn-outline { background: #000; color: #fff; }
     .overlay .score-big { font-size: 2.2rem; font-weight: 800; margin: 8px 0; }
     .overlay .loading { opacity: 0.5; font-size: 0.85rem; }
@@ -259,7 +267,7 @@
 -----------------------------------------</pre>
       <pre id="lb-text-bot"></pre>
     </div>
-    <button class="btn" id="btn-play" style="margin-top:16px">GIOCA</button>
+    <div id="btn-play" class="receipt-btn" style="margin-top:16px">(GIOCA)</div>
   </div>
 
   <!-- GAME OVER SCREEN (shown after game ends) -->
@@ -274,7 +282,7 @@
       </div>
       <pre id="go-receipt-bot"></pre>
     </div>
-    <button class="btn" id="btn-avanti" style="margin-top:12px;position:relative;z-index:1">SALVA</button>
+    <div id="btn-avanti" class="receipt-btn" style="margin-top:12px;position:relative;z-index:1">(SALVA)</div>
   </div>
 
   <!-- SPLASH SCREEN -->
